@@ -59,7 +59,7 @@ export async function createDocument(
 
   const title = String(formData.get('title') ?? '').trim() || DEFAULT_DOCUMENT_TITLE;
   const projectIdInput = String(formData.get('projectId') ?? '').trim();
-  const requestedStorage = formData.get('storage') === 'git' ? 'git' : 'local';
+  const requestedStorage = formData.get('storage') === 'git' ? 'git' : 'db';
 
   let project: { id: string; slug: string } | null = null;
   if (projectIdInput) {
@@ -80,7 +80,7 @@ export async function createDocument(
   const drive = await getDrive();
   const driveConnected = drive?.status === 'connected';
 
-  const localCount = (
+  const dbCount = (
     await db
       .select({ id: docsDocuments.id })
       .from(docsDocuments)
@@ -88,13 +88,13 @@ export async function createDocument(
         and(
           eq(docsDocuments.tenantId, tenantId),
           eq(docsDocuments.ownerId, userId),
-          eq(docsDocuments.storage, 'local'),
+          eq(docsDocuments.storage, 'db'),
         ),
       )
   ).length;
 
   const limit = await getFreeDocLimit();
-  const decision = resolveDocumentStorage(requestedStorage, localCount, limit, driveConnected);
+  const decision = resolveDocumentStorage(requestedStorage, dbCount, limit, driveConnected);
   if (!decision.ok) return decision;
 
   const slugFilter = project
@@ -155,11 +155,11 @@ export interface DocumentsOverview {
     title: string;
     slug: string;
     projectId: string | null;
-    storage: 'local' | 'git';
+    storage: 'db' | 'git';
     /** Whether this user owns the document (`docs_documents.ownerId`) vs. has it shared with them (D-13). */
     owned: boolean;
   }[];
-  localCount: number;
+  dbCount: number;
   limit: number;
   driveConnected: boolean;
 }
@@ -217,13 +217,13 @@ export async function listDocumentsOverview(drive: DriveView | null): Promise<Do
     ...doc,
     owned: ownerId === userId,
   }));
-  const localCount = documents.filter((doc) => doc.owned && doc.storage === 'local').length;
+  const dbCount = documents.filter((doc) => doc.owned && doc.storage === 'db').length;
   const limit = await getFreeDocLimit();
 
   return {
     projects,
     documents,
-    localCount,
+    dbCount,
     limit,
     driveConnected: drive?.status === 'connected',
   };
@@ -231,7 +231,7 @@ export async function listDocumentsOverview(drive: DriveView | null): Promise<Do
 
 export interface ProjectOverview {
   project: { id: string; name: string; slug: string };
-  documents: { id: string; title: string; storage: 'local' | 'git' }[];
+  documents: { id: string; title: string; storage: 'db' | 'git' }[];
 }
 
 /**
@@ -274,7 +274,7 @@ export interface DocumentEditorData {
   title: string;
   slug: string;
   content: string;
-  storage: 'local' | 'git';
+  storage: 'db' | 'git';
   syncStatus: 'synced' | 'pending' | 'conflict' | null;
   /** The current user's `docs_document_members` role — 'owner' gates the Share dialog (D-13). */
   role: 'owner' | 'editor' | 'viewer';

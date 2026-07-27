@@ -135,7 +135,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'local'"
+          "default": "'db'"
         },
         "git_path": {
           "name": "git_path",

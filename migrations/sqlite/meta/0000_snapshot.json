@@ -132,7 +132,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'local'"
+          "default": "'db'"
         },
         "git_path": {
           "name": "git_path",

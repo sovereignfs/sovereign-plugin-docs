@@ -17,7 +17,7 @@ CREATE TABLE `docs_documents` (
 	`title` text NOT NULL,
 	`slug` text NOT NULL,
 	`content` text DEFAULT '' NOT NULL,
-	`storage` text DEFAULT 'local' NOT NULL,
+	`storage` text DEFAULT 'db' NOT NULL,
 	`git_path` text,
 	`base_sha` text,
 	`sync_status` text,

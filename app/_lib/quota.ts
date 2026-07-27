@@ -1,7 +1,7 @@
 import { sdk } from '@sovereignfs/sdk';
 
 /**
- * Operator-configurable cap on local (non-git) documents per user (SPEC.md
+ * Operator-configurable cap on db-only (non-git) documents per user (SPEC.md
  * "Document quota"). Set via the manifest `env.FREE_DOC_LIMIT` declaration,
  * resolved at runtime from `SV_PLUGIN_FS_SOVEREIGN_DOCS_FREE_DOC_LIMIT`.
  * Git-backed documents never count against this limit.
@@ -21,18 +21,18 @@ export function parseFreeDocLimit(raw: string | null | undefined): number {
   return parsed;
 }
 
-/** Reads the operator's configured local-document limit for the current plugin route context. */
+/** Reads the operator's configured db-document limit for the current plugin route context. */
 export async function getFreeDocLimit(): Promise<number> {
   const raw = await sdk.env.get('FREE_DOC_LIMIT');
   return parseFreeDocLimit(raw);
 }
 
 /**
- * Whether a user with `localDocumentCount` existing local documents may
+ * Whether a user with `dbDocumentCount` existing db-only documents may
  * create one more, given `limit`. Pure — callers supply the count (from
- * `docs_documents WHERE owner_id = ? AND storage = 'local'`) and the limit
+ * `docs_documents WHERE owner_id = ? AND storage = 'db'`) and the limit
  * (from `getFreeDocLimit()`).
  */
-export function canCreateLocalDocument(localDocumentCount: number, limit: number): boolean {
-  return localDocumentCount < limit;
+export function canCreateDbDocument(dbDocumentCount: number, limit: number): boolean {
+  return dbDocumentCount < limit;
 }

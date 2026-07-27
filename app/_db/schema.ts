@@ -52,15 +52,15 @@ export const docsDocuments = sqliteTable('docs_documents', {
   slug: text('slug').notNull(),
   /** Canonical Markdown, autosaved directly (no separate draft row). */
   content: text('content').notNull().default(''),
-  /** Storage tier: `local` (DB only, counts against the quota) or `git` (mirrored to a drive). */
-  storage: text('storage', { enum: ['local', 'git'] })
+  /** Storage tier: `db` (DB only, counts against the quota) or `git` (mirrored to a drive). */
+  storage: text('storage', { enum: ['db', 'git'] })
     .notNull()
-    .default('local'),
+    .default('db'),
   /** Path within the connected repo, once git-backed (e.g. `docs/<project>/<slug>.md`). */
   gitPath: text('git_path'),
   /** Last-synced git blob/commit SHA — backs conflict detection on the next sync. */
   baseSha: text('base_sha'),
-  /** Sync state for git-backed documents; null for local documents. */
+  /** Sync state for git-backed documents; null for db-only documents. */
   syncStatus: text('sync_status', { enum: ['synced', 'pending', 'conflict'] }),
   lastSyncedAt: integer('last_synced_at'),
   createdAt: integer('created_at').notNull(),

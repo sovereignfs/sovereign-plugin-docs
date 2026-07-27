@@ -26,7 +26,7 @@ const PLUGIN_ID = 'fs.sovereign.docs';
 // documentMembers to a full picture — every member of a document you own,
 // not just your own membership row — so an export honestly reflects who a
 // document is shared with (SPEC.md "Portability and deletion"). Import stays
-// additive-only and still re-normalizes storage to 'local' on every restored
+// additive-only and still re-normalizes storage to 'db' on every restored
 // document (a git mirror is never re-created without reconnecting a drive).
 const EXPORT_SCHEMA_VERSION = 3;
 
@@ -71,7 +71,7 @@ interface ExportDocument {
   title: string;
   slug: string;
   content: string;
-  storage: 'local' | 'git';
+  storage: 'db' | 'git';
   gitPath: string | null;
   syncStatus: 'synced' | 'pending' | 'conflict' | null;
   lastSyncedAt: number | null;
@@ -264,7 +264,7 @@ async function importDocsData(section: PluginExportSection, ctx: ImportContext):
       title: d.title,
       slug: d.slug,
       content: d.content,
-      storage: 'local',
+      storage: 'db',
       gitPath: null,
       baseSha: null,
       syncStatus: null,

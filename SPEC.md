@@ -8,7 +8,7 @@
 
 ---
 
-Sovereign Docs is a **local-first document workspace** — a clean, Google-Docs-style
+Sovereign Docs is a **privacy-first document workspace** — a clean, Google-Docs-style
 place to write and organise documents. Documents are **Markdown under the hood**
 (own-your-data: exportable as plain `.md` any time) but edited through a familiar
 rich-text/WYSIWYG surface. Content lives on the platform by default; connecting a
@@ -173,8 +173,8 @@ The free local tier is bounded by an **operator-set limit**, `FREE_DOC_LIMIT`.
 - **Parsing:** parse as an integer. If unset, non-numeric, or `<= 0`, fall back to
   the default **25**. This lives in a small pure helper (`app/_lib/quota.ts`) so it
   is unit-tested independently of any request.
-- **What it counts:** the number of the current user's **local** documents —
-  `docs_documents WHERE owner_id = <me> AND storage = 'local'` (tenant-scoped).
+- **What it counts:** the number of the current user's **db** documents —
+  `docs_documents WHERE owner_id = <me> AND storage = 'db'` (tenant-scoped).
   Git-backed documents do **not** count and are unlimited.
 - **Enforcement:** at **create time**. If the user has no drive connected and is at
   the limit, block creation with a Google-Docs-style dialog:
@@ -311,7 +311,7 @@ draft→publish model and implies per-user collaboration that is post-v1), and a
 
 | Table                   | Key columns                                                                                                                                                                       |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs_documents`        | `id`, `tenant_id`, `owner_id`, `project_id?`, `title`, `slug`, **`content`** (canonical Markdown), **`storage`** (`local`\|`git`), `git_path?`, `base_sha?`, `sync_status?` (`synced`\|`pending`\|`conflict`), `last_synced_at?`, `created_at`, `updated_at` |
+| `docs_documents`        | `id`, `tenant_id`, `owner_id`, `project_id?`, `title`, `slug`, **`content`** (canonical Markdown), **`storage`** (`db`\|`git`), `git_path?`, `base_sha?`, `sync_status?` (`synced`\|`pending`\|`conflict`), `last_synced_at?`, `created_at`, `updated_at` |
 | `docs_projects`         | `id`, `tenant_id`, `owner_id`, `name`, `slug`, `created_at`                                                                                                                        |
 | `docs_user_prefs`       | `user_id` (PK), `tenant_id`, `default_view` (`markdown`\|`wysiwyg`), `created_at`, `updated_at`                                                                                    |
 | `docs_drives`           | `user_id` (PK, one repo/user), `tenant_id`, `connection_id` (→ `sdk.connections`), `branch`, `base_path` (`docs`), `created_at` — **optional now; only exists for git-backed docs** |

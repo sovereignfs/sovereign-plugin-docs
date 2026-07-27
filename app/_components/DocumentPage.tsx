@@ -17,7 +17,7 @@ const AUTOSAVE_IDLE_MS = 2000;
 
 type AutosaveState = 'idle' | 'saving' | 'saved' | 'error';
 type Mode = 'view' | 'edit';
-type Storage = 'local' | 'git';
+type Storage = 'db' | 'git';
 type SyncStatus = 'synced' | 'pending' | 'conflict' | null;
 
 interface DocumentPageProps {

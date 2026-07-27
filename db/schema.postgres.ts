@@ -38,7 +38,7 @@ export const docsDocuments = pgTable('docs_documents', {
   title: text('title').notNull(),
   slug: text('slug').notNull(),
   content: text('content').notNull().default(''),
-  storage: text('storage').notNull().default('local'),
+  storage: text('storage').notNull().default('db'),
   gitPath: text('git_path'),
   baseSha: text('base_sha'),
   syncStatus: text('sync_status'),

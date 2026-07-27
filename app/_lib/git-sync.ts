@@ -17,7 +17,7 @@ interface DocRow {
   slug: string;
   content: string;
   projectId: string | null;
-  storage: 'local' | 'git';
+  storage: 'db' | 'git';
   gitPath: string | null;
   baseSha: string | null;
 }

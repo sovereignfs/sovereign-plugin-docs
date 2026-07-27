@@ -3,7 +3,7 @@
   "id": "fs.sovereign.docs",
   "name": "Docs",
   "version": "0.2.0",
-  "description": "A local-first document workspace with optional git sync.",
+  "description": "A privacy-first document workspace.",
   "development": true,
   "type": "sovereign",
   "runtime": "native",

@@ -69,16 +69,16 @@ describe('getFreeDocLimit', () => {
   });
 });
 
-describe('canCreateLocalDocument', () => {
+describe('canCreateDbDocument', () => {
   it('allows creation while under the limit', async () => {
-    const { canCreateLocalDocument } = await import('../quota');
-    expect(canCreateLocalDocument(0, 25)).toBe(true);
-    expect(canCreateLocalDocument(24, 25)).toBe(true);
+    const { canCreateDbDocument } = await import('../quota');
+    expect(canCreateDbDocument(0, 25)).toBe(true);
+    expect(canCreateDbDocument(24, 25)).toBe(true);
   });
 
   it('blocks creation at or above the limit', async () => {
-    const { canCreateLocalDocument } = await import('../quota');
-    expect(canCreateLocalDocument(25, 25)).toBe(false);
-    expect(canCreateLocalDocument(30, 25)).toBe(false);
+    const { canCreateDbDocument } = await import('../quota');
+    expect(canCreateDbDocument(25, 25)).toBe(false);
+    expect(canCreateDbDocument(30, 25)).toBe(false);
   });
 });

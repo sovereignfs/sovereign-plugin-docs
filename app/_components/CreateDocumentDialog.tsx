@@ -29,7 +29,7 @@ export function CreateDocumentDialog({
   }, [state]);
 
   // resolveDocumentStorage() (document-rules.ts) only mentions "git-backed"
-  // in its error copy when a drive is already connected and the local quota
+  // in its error copy when a drive is already connected and the db quota
   // was the reason for the block — exactly when offering the retry makes sense.
   const offerGitBackedRetry = Boolean(
     state && !state.ok && driveConnected && state.error.includes('git-backed'),
@@ -83,7 +83,7 @@ export function CreateDocumentDialog({
                 Create as git-backed instead
               </Button>
             )}
-            <Button type="submit" name="storage" value="local" disabled={pending}>
+            <Button type="submit" name="storage" value="db" disabled={pending}>
               {pending ? 'Creating…' : 'Create'}
             </Button>
           </div>

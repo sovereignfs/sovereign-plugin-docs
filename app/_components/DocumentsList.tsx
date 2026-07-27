@@ -19,7 +19,7 @@ import styles from './DocumentsList.module.css';
  * entity to browse into otherwise — this is its only findable location.
  */
 export function DocumentsList({ overview }: { overview: DocumentsOverview }) {
-  const { projects, documents, localCount, limit, driveConnected } = overview;
+  const { projects, documents, dbCount, limit, driveConnected } = overview;
   const [query, setQuery] = useState('');
 
   const visibleDocuments = useMemo(
@@ -44,7 +44,7 @@ export function DocumentsList({ overview }: { overview: DocumentsOverview }) {
         <p className={styles.quota}>
           {driveConnected
             ? 'Unlimited documents (Git connected)'
-            : `${localCount} of ${limit} documents`}
+            : `${dbCount} of ${limit} documents`}
         </p>
         <div className={styles.actions}>
           <CreateProjectDialog />

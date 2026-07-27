@@ -1,4 +1,4 @@
-import { canCreateLocalDocument } from './quota';
+import { canCreateDbDocument } from './quota';
 
 export const DEFAULT_DOCUMENT_TITLE = 'Untitled document';
 
@@ -31,7 +31,7 @@ export function buildGitPath(basePath: string, projectSlug: string | null, slug:
   ).join('/');
 }
 
-export type DocumentStorage = 'local' | 'git';
+export type DocumentStorage = 'db' | 'git';
 
 export type DocumentStorageDecision =
   | { ok: true; storage: DocumentStorage }
@@ -41,14 +41,14 @@ export type DocumentStorageDecision =
  * Resolves whether a document-create request may proceed, and under which
  * storage tier (SPEC.md "Document quota" / "Storage tiers"). `requestedStorage`
  * is what the create form asked for:
- * - `'git'` always requires a connected drive, regardless of the local quota.
- * - `'local'` is quota-gated; at the limit, the error differs depending on
+ * - `'git'` always requires a connected drive, regardless of the db quota.
+ * - `'db'` is quota-gated; at the limit, the error differs depending on
  *   whether a drive is already connected (offers git-backed instead, which
  *   doesn't count against the limit) or not (prompts to connect one).
  */
 export function resolveDocumentStorage(
   requestedStorage: DocumentStorage,
-  localDocumentCount: number,
+  dbDocumentCount: number,
   limit: number,
   driveConnected: boolean,
 ): DocumentStorageDecision {
@@ -62,8 +62,8 @@ export function resolveDocumentStorage(
     return { ok: true, storage: 'git' };
   }
 
-  if (canCreateLocalDocument(localDocumentCount, limit)) {
-    return { ok: true, storage: 'local' };
+  if (canCreateDbDocument(dbDocumentCount, limit)) {
+    return { ok: true, storage: 'db' };
   }
 
   if (driveConnected) {

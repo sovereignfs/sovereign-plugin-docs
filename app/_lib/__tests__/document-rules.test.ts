@@ -48,12 +48,12 @@ describe('buildGitPath', () => {
 });
 
 describe('resolveDocumentStorage', () => {
-  it('allows a local document under the limit', () => {
-    expect(resolveDocumentStorage('local', 5, 25, false)).toEqual({ ok: true, storage: 'local' });
+  it('allows a db document under the limit', () => {
+    expect(resolveDocumentStorage('db', 5, 25, false)).toEqual({ ok: true, storage: 'db' });
   });
 
-  it('blocks a local document at the limit with no drive connected', () => {
-    const result = resolveDocumentStorage('local', 25, 25, false);
+  it('blocks a db document at the limit with no drive connected', () => {
+    const result = resolveDocumentStorage('db', 25, 25, false);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toMatch(/reached your 25 free documents/);
@@ -62,7 +62,7 @@ describe('resolveDocumentStorage', () => {
   });
 
   it('offers a git-backed retry when at the limit with a drive connected', () => {
-    const result = resolveDocumentStorage('local', 25, 25, true);
+    const result = resolveDocumentStorage('db', 25, 25, true);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toMatch(/git-backed instead/);

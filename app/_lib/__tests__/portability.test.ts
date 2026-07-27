@@ -168,8 +168,8 @@ describe('portability export', () => {
       { id: 'proj-2', tenantId: 't1', ownerId: 'other', name: 'Not mine', slug: 'not-mine', createdAt: 1 },
     ];
     store.docs_documents = [
-      { id: 'doc-1', tenantId: 't1', ownerId: 'u1', projectId: 'proj-1', title: 'Onboarding', slug: 'onboarding', content: 'Hello', storage: 'local', gitPath: null, baseSha: null, syncStatus: null, lastSyncedAt: null, createdAt: 1, updatedAt: 1 },
-      { id: 'doc-2', tenantId: 't1', ownerId: 'other', projectId: 'proj-2', title: 'Not mine', slug: 'not-mine', content: 'nope', storage: 'local', gitPath: null, baseSha: null, syncStatus: null, lastSyncedAt: null, createdAt: 1, updatedAt: 1 },
+      { id: 'doc-1', tenantId: 't1', ownerId: 'u1', projectId: 'proj-1', title: 'Onboarding', slug: 'onboarding', content: 'Hello', storage: 'db', gitPath: null, baseSha: null, syncStatus: null, lastSyncedAt: null, createdAt: 1, updatedAt: 1 },
+      { id: 'doc-2', tenantId: 't1', ownerId: 'other', projectId: 'proj-2', title: 'Not mine', slug: 'not-mine', content: 'nope', storage: 'db', gitPath: null, baseSha: null, syncStatus: null, lastSyncedAt: null, createdAt: 1, updatedAt: 1 },
     ];
     store.docs_document_members = [
       { documentId: 'doc-1', userId: 'u1', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
@@ -196,7 +196,7 @@ describe('portability export', () => {
     expect(data.defaultView).toBe('wysiwyg');
     expect(data.projects.map((p) => p.id)).toEqual(['proj-1']);
     expect(data.documents.map((d) => d.id)).toEqual(['doc-1']);
-    expect(data.documents[0]).toMatchObject({ content: 'Hello', storage: 'local' });
+    expect(data.documents[0]).toMatchObject({ content: 'Hello', storage: 'db' });
     // Every member of the owned document doc-1 is included, not just the exporting user's own row.
     expect(data.documentMembers.map((m) => `${m.documentId}:${m.userId}:${m.role}`).sort()).toEqual(
       ['doc-1:shared-with:viewer', 'doc-1:u1:owner'].sort(),
@@ -236,7 +236,7 @@ describe('portability import', () => {
         projectId: 'new-src-proj-1',
         ownerId: 'u2',
         content: 'Hello',
-        storage: 'local',
+        storage: 'db',
         gitPath: null,
         syncStatus: null,
       }),
@@ -276,9 +276,9 @@ describe('portability delete', () => {
     store.docs_drives = [{ userId: 'u1', tenantId: 't1', connectionId: 'conn-1', branch: 'main', basePath: 'docs', createdAt: 1 }];
     store.docs_projects = [{ id: 'proj-1', tenantId: 't1', ownerId: 'u1', name: 'Mine', slug: 'mine', createdAt: 1 }];
     store.docs_documents = [
-      { id: 'doc-1', tenantId: 't1', ownerId: 'u1', projectId: 'proj-1', title: 'Mine, shared', slug: 'mine', content: 'a', storage: 'local', createdAt: 1, updatedAt: 1 },
-      { id: 'doc-2', tenantId: 't1', ownerId: 'u1', projectId: null, title: 'Mine, sole', slug: 'sole', content: 'c', storage: 'local', createdAt: 1, updatedAt: 1 },
-      { id: 'doc-3', tenantId: 't1', ownerId: 'other', projectId: null, title: 'Not mine', slug: 'not-mine', content: 'b', storage: 'local', createdAt: 1, updatedAt: 1 },
+      { id: 'doc-1', tenantId: 't1', ownerId: 'u1', projectId: 'proj-1', title: 'Mine, shared', slug: 'mine', content: 'a', storage: 'db', createdAt: 1, updatedAt: 1 },
+      { id: 'doc-2', tenantId: 't1', ownerId: 'u1', projectId: null, title: 'Mine, sole', slug: 'sole', content: 'c', storage: 'db', createdAt: 1, updatedAt: 1 },
+      { id: 'doc-3', tenantId: 't1', ownerId: 'other', projectId: null, title: 'Not mine', slug: 'not-mine', content: 'b', storage: 'db', createdAt: 1, updatedAt: 1 },
     ];
     store.docs_user_prefs = [
       { userId: 'u1', tenantId: 't1', defaultView: 'wysiwyg', createdAt: 1, updatedAt: 1 },
