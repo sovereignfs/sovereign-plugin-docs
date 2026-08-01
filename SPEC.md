@@ -108,7 +108,7 @@ Still genuinely absent (confirmed no code):
 | `permissions`                      | `auth:session`, `db:readWrite`, `mailer:send`, `notifications:send`, `data:provide`, `data:export`, `data:import` |
 | `env`                              | `FREE_DOC_LIMIT` (see [Document quota](#document-quota))                                |
 | `connections`                      | `github` provider (only needed once OAuth lands — D-18)                                 |
-| `repository`                       | `https://github.com/sovereignfs/sovereign-docs`                                        |
+| `repository`                       | `https://github.com/sovereignfs/sovereign-plugin-docs`                                        |
 | `compatibility.minPlatformVersion` | `0.19.0`; public document routes additionally need RFC 0042, not yet landed             |
 
 Manifest additions for v0.3 (added by the quota task, D-06):
