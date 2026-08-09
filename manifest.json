@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "fs.sovereign.docs",
   "name": "Docs",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "A privacy-first document workspace.",
   "development": true,
   "type": "sovereign",
@@ -10,8 +10,7 @@
   "routePrefix": "/docs",
   "shell": "default",
   "database": {
-    "isolation": "isolated",
-    "dialect": "sqlite"
+    "isolation": "isolated"
   },
   "icon": "icon.svg",
   "permissions": [
