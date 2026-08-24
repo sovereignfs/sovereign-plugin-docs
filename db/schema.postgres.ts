@@ -21,7 +21,7 @@ export const docsDrives = pgTable('docs_drives', {
   createdAt: integer('created_at').notNull(),
 });
 
-export const docsProjects = pgTable('docs_projects', {
+export const docsFolders = pgTable('docs_folders', {
   id: text('id').primaryKey(),
   tenantId: text('tenant_id').notNull(),
   ownerId: text('owner_id').notNull(),
@@ -34,7 +34,7 @@ export const docsDocuments = pgTable('docs_documents', {
   id: text('id').primaryKey(),
   tenantId: text('tenant_id').notNull(),
   ownerId: text('owner_id').notNull(),
-  projectId: text('project_id'),
+  folderId: text('folder_id').notNull(),
   title: text('title').notNull(),
   slug: text('slug').notNull(),
   content: text('content').notNull().default(''),
@@ -71,10 +71,10 @@ export const docsDocumentMembers = pgTable(
   ],
 );
 
-export const docsProjectMembers = pgTable(
-  'docs_project_members',
+export const docsFolderMembers = pgTable(
+  'docs_folder_members',
   {
-    projectId: text('project_id').notNull(),
+    folderId: text('folder_id').notNull(),
     userId: text('user_id').notNull(),
     tenantId: text('tenant_id').notNull(),
     role: text('role').notNull(),
@@ -82,7 +82,7 @@ export const docsProjectMembers = pgTable(
     joinedAt: integer('joined_at').notNull(),
   },
   (t) => [
-    primaryKey({ columns: [t.projectId, t.userId] }),
-    uniqueIndex('docs_project_members_project_user_idx').on(t.projectId, t.userId),
+    primaryKey({ columns: [t.folderId, t.userId] }),
+    uniqueIndex('docs_folder_members_folder_user_idx').on(t.folderId, t.userId),
   ],
 );

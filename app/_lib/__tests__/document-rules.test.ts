@@ -38,11 +38,7 @@ describe('uniqueSlug', () => {
 });
 
 describe('buildGitPath', () => {
-  it('joins basePath and slug for a standalone document', () => {
-    expect(buildGitPath('docs', null, 'onboarding')).toBe('docs/onboarding.md');
-  });
-
-  it('includes the project slug when present', () => {
+  it('joins basePath, folder slug, and slug — every document has a folder', () => {
     expect(buildGitPath('docs', 'handbook', 'onboarding')).toBe('docs/handbook/onboarding.md');
   });
 });

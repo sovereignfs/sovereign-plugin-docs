@@ -1,24 +1,22 @@
 'use client';
 
 import { useActionState, useEffect, useState, type ReactNode } from 'react';
-import { Button, Dialog, FormField, Input, Select } from '@sovereignfs/ui';
+import { Button, Dialog, FormField, Input } from '@sovereignfs/ui';
 import type { ActionResult } from '../_lib/context';
 import { createDocument } from '../_lib/documents';
 import styles from './DialogForm.module.css';
 
 interface CreateDocumentDialogProps {
-  projects: { id: string; name: string }[];
+  /** The document is always created directly in this folder — every document belongs to one. */
+  folderId: string;
   driveConnected: boolean;
-  /** When set, the document is created directly in this project — no picker shown (project page context). */
-  fixedProjectId?: string;
   /** Custom trigger instead of the default "New document" button — e.g. a dashed NewCardTile in a grid. */
   renderTrigger?: (props: { onClick: () => void }) => ReactNode;
 }
 
 export function CreateDocumentDialog({
-  projects,
+  folderId,
   driveConnected,
-  fixedProjectId,
   renderTrigger,
 }: CreateDocumentDialogProps) {
   const [open, setOpen] = useState(false);
@@ -57,24 +55,7 @@ export function CreateDocumentDialog({
           <FormField label="Title">
             {(field) => <Input {...field} name="title" placeholder="Untitled document" />}
           </FormField>
-          {fixedProjectId ? (
-            <input type="hidden" name="projectId" value={fixedProjectId} />
-          ) : (
-            projects.length > 0 && (
-              <FormField label="Project" hint="Optional.">
-                {(field) => (
-                  <Select {...field} name="projectId" defaultValue="">
-                    <option value="">No project</option>
-                    {projects.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </FormField>
-            )
-          )}
+          <input type="hidden" name="folderId" value={folderId} />
           <div className={styles.actions}>
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               Cancel
