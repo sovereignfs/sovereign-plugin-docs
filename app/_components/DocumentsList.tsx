@@ -1,57 +1,49 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { CardTile, CardTileGrid, EmptyState, Icon, Input, NewCardTile } from '@sovereignfs/ui';
+import { useState } from 'react';
+import { CardTile, CardTileGrid, EmptyState, Icon, Input } from '@sovereignfs/ui';
 import type { DocumentsOverview } from '../_lib/documents';
-import { CreateDocumentDialog } from './CreateDocumentDialog';
-import { CreateProjectDialog } from './CreateProjectDialog';
+import { CreateFolderDialog } from './CreateFolderDialog';
 import styles from './DocumentsList.module.css';
 
 /**
  * Drive-style home (D-09), grouped like the Kanban plugin's own home page:
- * "My projects" / "Shared with me" (split on `docs_project_members` role —
- * project sharing, unlike Kanban's board-membership-separate model, also
- * grants access to every document already filed under the project, see
- * `documents.ts`'s `resolveDocumentRole`), then a flat "Documents" section.
+ * "My folders" / "Shared with me" (split on `docs_folder_members` role —
+ * folder sharing, unlike Kanban's board-membership-separate model, also
+ * grants access to every document already filed under the folder, see
+ * `documents.ts`'s `resolveDocumentRole`), then a flat "Shared documents"
+ * section.
  *
- * An **owned** document only shows in "Documents" when it's root-level
- * (`projectId === null`) — one filed under a project appears on that
- * project's own page (`/docs/projects/[projectId]`) instead, same
- * top-level-only convention as Google Drive's "My Drive" root. A
- * **shared-with-me** document (D-13) always shows here regardless of its
- * `projectId`, since the recipient has no access to the owner's project
- * entity to browse into otherwise — this is its only findable location.
- * A document reachable purely via project role (not an individual share)
- * stays out of this flat list too — it's browsable by opening the project.
+ * Every document now belongs to a folder — there's no root level, so
+ * document creation only ever happens from inside a folder
+ * (`FolderDocumentsGrid`/the folder detail page), never here. "Shared
+ * documents" only ever holds documents individually shared with this user
+ * (D-13) — an owned document is always reachable by opening its folder
+ * instead, never shown flat.
  *
- * Search collapses back to a flat "Projects"/"Documents" match list (no
+ * Search collapses back to a flat "Folders"/"Documents" match list (no
  * grouping) — grouping exists for browsing, not filtering.
  */
 export function DocumentsList({ overview }: { overview: DocumentsOverview }) {
-  const { projects, documents, dbCount, limit, driveConnected } = overview;
+  const { folders, documents, dbCount, limit, driveConnected } = overview;
   const [query, setQuery] = useState('');
-
-  const visibleDocuments = useMemo(
-    () => documents.filter((doc) => (doc.owned ? doc.projectId === null : true)),
-    [documents],
-  );
 
   const normalizedQuery = query.trim().toLowerCase();
   const isSearching = normalizedQuery.length > 0;
-  const filteredProjects = isSearching
-    ? projects.filter((project) => project.name.toLowerCase().includes(normalizedQuery))
-    : projects;
+  const filteredFolders = isSearching
+    ? folders.filter((folder) => folder.name.toLowerCase().includes(normalizedQuery))
+    : folders;
   const filteredDocuments = isSearching
-    ? visibleDocuments.filter((doc) => doc.title.toLowerCase().includes(normalizedQuery))
-    : visibleDocuments;
+    ? documents.filter((doc) => doc.title.toLowerCase().includes(normalizedQuery))
+    : documents;
 
-  const isEmptyWorkspace = projects.length === 0 && visibleDocuments.length === 0;
+  const isEmptyWorkspace = folders.length === 0 && documents.length === 0;
   const hasNoResults =
-    isSearching && filteredProjects.length === 0 && filteredDocuments.length === 0;
+    isSearching && filteredFolders.length === 0 && filteredDocuments.length === 0;
 
-  const myProjects = filteredProjects.filter((project) => project.role === 'owner');
-  const sharedProjects = filteredProjects.filter((project) => project.role !== 'owner');
+  const myFolders = filteredFolders.filter((folder) => folder.role === 'owner');
+  const sharedFolders = filteredFolders.filter((folder) => folder.role !== 'owner');
 
   return (
     <div className={styles.section}>
@@ -61,7 +53,7 @@ export function DocumentsList({ overview }: { overview: DocumentsOverview }) {
             ? 'Unlimited documents (Git connected)'
             : `${dbCount} of ${limit} documents`}
         </p>
-        <CreateProjectDialog />
+        <CreateFolderDialog />
       </div>
 
       {!isEmptyWorkspace && (
@@ -69,28 +61,28 @@ export function DocumentsList({ overview }: { overview: DocumentsOverview }) {
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search documents and projects…"
-          aria-label="Search documents and projects"
+          placeholder="Search documents and folders…"
+          aria-label="Search documents and folders"
           className={styles.search}
         />
       )}
 
       {isEmptyWorkspace ? (
         <EmptyState
-          heading="No documents yet"
-          description="Create your first document to get started."
-          action={<CreateDocumentDialog projects={projects} driveConnected={driveConnected} />}
+          heading="No folders yet"
+          description="Create your first folder to get started."
+          action={<CreateFolderDialog />}
         />
       ) : hasNoResults ? (
         <EmptyState heading="No matches" description={`Nothing found for "${query}".`} />
       ) : isSearching ? (
         <div className={styles.lists}>
-          {filteredProjects.length > 0 && (
+          {filteredFolders.length > 0 && (
             <div>
-              <h2 className={styles.heading}>Projects</h2>
+              <h2 className={styles.heading}>Folders</h2>
               <CardTileGrid>
-                {filteredProjects.map((project) => (
-                  <ProjectTile key={project.id} project={project} />
+                {filteredFolders.map((folder) => (
+                  <FolderTile key={folder.id} folder={folder} />
                 ))}
               </CardTileGrid>
             </div>
@@ -109,13 +101,13 @@ export function DocumentsList({ overview }: { overview: DocumentsOverview }) {
       ) : (
         <div className={styles.lists}>
           <div>
-            <h2 className={styles.heading}>My projects</h2>
-            {myProjects.length === 0 ? (
-              <p className={styles.groupEmpty}>You haven&apos;t created a project yet.</p>
+            <h2 className={styles.heading}>My folders</h2>
+            {myFolders.length === 0 ? (
+              <p className={styles.groupEmpty}>You haven&apos;t created a folder yet.</p>
             ) : (
               <CardTileGrid>
-                {myProjects.map((project) => (
-                  <ProjectTile key={project.id} project={project} />
+                {myFolders.map((folder) => (
+                  <FolderTile key={folder.id} folder={folder} />
                 ))}
               </CardTileGrid>
             )}
@@ -123,49 +115,44 @@ export function DocumentsList({ overview }: { overview: DocumentsOverview }) {
 
           <div>
             <h2 className={styles.heading}>Shared with me</h2>
-            {sharedProjects.length === 0 ? (
+            {sharedFolders.length === 0 ? (
               <p className={styles.groupEmpty}>Nothing shared with you yet.</p>
             ) : (
               <CardTileGrid>
-                {sharedProjects.map((project) => (
-                  <ProjectTile key={project.id} project={project} shared />
+                {sharedFolders.map((folder) => (
+                  <FolderTile key={folder.id} folder={folder} shared />
                 ))}
               </CardTileGrid>
             )}
           </div>
 
-          <div>
-            <h2 className={styles.heading}>Documents</h2>
-            <CardTileGrid>
-              {filteredDocuments.map((doc) => (
-                <DocumentTile key={doc.id} doc={doc} />
-              ))}
-              <CreateDocumentDialog
-                projects={projects}
-                driveConnected={driveConnected}
-                renderTrigger={({ onClick }) => (
-                  <NewCardTile label="New document" onClick={onClick} />
-                )}
-              />
-            </CardTileGrid>
-          </div>
+          {documents.length > 0 && (
+            <div>
+              <h2 className={styles.heading}>Shared documents</h2>
+              <CardTileGrid>
+                {filteredDocuments.map((doc) => (
+                  <DocumentTile key={doc.id} doc={doc} />
+                ))}
+              </CardTileGrid>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function ProjectTile({
-  project,
+function FolderTile({
+  folder,
   shared = false,
 }: {
-  project: DocumentsOverview['projects'][number];
+  folder: DocumentsOverview['folders'][number];
   shared?: boolean;
 }) {
   return (
-    <Link href={`/docs/projects/${project.id}`}>
+    <Link href={`/docs/folders/${folder.id}`}>
       <CardTile banner={<Icon name="folder" size="lg" aria-hidden={true} />}>
-        <span className={styles.tileLabel}>{project.name}</span>
+        <span className={styles.tileLabel}>{folder.name}</span>
         {shared && <span className={styles.tileBadge}>Shared</span>}
       </CardTile>
     </Link>

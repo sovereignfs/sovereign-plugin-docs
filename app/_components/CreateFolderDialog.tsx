@@ -3,13 +3,13 @@
 import { useActionState, useEffect, useState } from 'react';
 import { Button, Dialog, FormField, Input } from '@sovereignfs/ui';
 import type { ActionResult } from '../_lib/context';
-import { createProject } from '../_lib/documents';
+import { createFolder } from '../_lib/documents';
 import styles from './DialogForm.module.css';
 
-export function CreateProjectDialog() {
+export function CreateFolderDialog() {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
-    createProject,
+    createFolder,
     null,
   );
 
@@ -20,9 +20,9 @@ export function CreateProjectDialog() {
   return (
     <>
       <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
-        New project
+        New folder
       </Button>
-      <Dialog open={open} onClose={() => setOpen(false)} size="sm" title="New project">
+      <Dialog open={open} onClose={() => setOpen(false)} size="sm" title="New folder">
         <form action={formAction} className={styles.form}>
           {state && !state.ok && (
             <p className={styles.feedbackError} role="status" aria-live="polite">
@@ -37,7 +37,7 @@ export function CreateProjectDialog() {
               Cancel
             </Button>
             <Button type="submit" disabled={pending}>
-              {pending ? 'Creating…' : 'Create project'}
+              {pending ? 'Creating…' : 'Create folder'}
             </Button>
           </div>
         </form>

@@ -4,39 +4,39 @@ import { useActionState, useEffect, useRef, useState } from 'react';
 import { Button, Dialog, FormField, Input, Select, Spinner, StatusBadge } from '@sovereignfs/ui';
 import type { DirectoryUser } from '@sovereignfs/sdk';
 import type { ActionResult } from '../_lib/context';
-import type { ProjectMemberRole } from '../_lib/project-rules';
-import type { ProjectMemberView } from '../_lib/project-sharing';
-import styles from './ProjectShareDialog.module.css';
+import type { FolderMemberRole } from '../_lib/folder-rules';
+import type { FolderMemberView } from '../_lib/folder-sharing';
+import styles from './FolderShareDialog.module.css';
 
 const SEARCH_DEBOUNCE_MS = 250;
 const MIN_QUERY_LENGTH = 2;
 
-interface ProjectShareDialogProps {
+interface FolderShareDialogProps {
   open: boolean;
   onClose: () => void;
-  listMembersAction: () => Promise<ProjectMemberView[]>;
+  listMembersAction: () => Promise<FolderMemberView[]>;
   searchUsersAction: (query: string) => Promise<DirectoryUser[]>;
   inviteAction: (prevState: ActionResult | null, formData: FormData) => Promise<ActionResult>;
   removeAction: (userId: string) => Promise<ActionResult>;
 }
 
 /**
- * Project-level sharing — owner-only member management, a sibling to
+ * Folder-level sharing — owner-only member management, a sibling to
  * `ShareDialog` (not a generic abstraction of it: same structure, but kept
- * independently evolvable). A project member's role also grants them access
- * to every document already filed under the project (the "shared folder"
+ * independently evolvable). A folder member's role also grants them access
+ * to every document already filed under the folder (the "shared folder"
  * model, see `documents.ts`'s `resolveDocumentRole`) — this dialog only
- * manages who's on the project, not per-document sharing.
+ * manages who's on the folder, not per-document sharing.
  */
-export function ProjectShareDialog({
+export function FolderShareDialog({
   open,
   onClose,
   listMembersAction,
   searchUsersAction,
   inviteAction,
   removeAction,
-}: ProjectShareDialogProps) {
-  const [members, setMembers] = useState<ProjectMemberView[] | null>(null);
+}: FolderShareDialogProps) {
+  const [members, setMembers] = useState<FolderMemberView[] | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<DirectoryUser[]>([]);
@@ -197,7 +197,7 @@ export function ProjectShareDialog({
   );
 }
 
-function formatRole(role: ProjectMemberRole) {
+function formatRole(role: FolderMemberRole) {
   if (role === 'owner') return 'Owner';
   if (role === 'editor') return 'Editor';
   return 'Viewer';
