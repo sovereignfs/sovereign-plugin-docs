@@ -1,51 +1,272 @@
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sv-space-4);
-  max-width: 840px;
-  margin-inline: auto;
-  padding: var(--sv-space-6);
+/* The single sticky context for both the secondary header and (while editing
+   in Rich text) the toolbar bar beneath it — `.body` (docs.module.css) is
+   this wrapper's nearest scrolling ancestor and has no `overflow: hidden`
+   along the way, so `position: sticky; top: 0` pins the whole wrapper in
+   place as the document scrolls beneath it, DocsHeader-style (it gets the
+   same always-visible effect for free, by living outside `.body` entirely;
+   this one has to ask for it explicitly since it's part of the scrollable
+   content). Putting `position: sticky` here rather than independently on
+   each child is what makes their spacing plain CSS flow instead of a
+   JS-measured offset — see RichTextEditor.tsx's top comment for the
+   approach this replaced and why it kept breaking. */
+.stickyChrome {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  /* The one border for the whole combined block — sits at the bottom of
+     whichever child is actually last (secondaryHeader alone in view/Markdown
+     mode, or the toolbar bar beneath it while editing in Rich text), instead
+     of each child drawing its own and creating a visible seam between them. */
+  border-bottom: 1px solid var(--sv-color-border);
 }
 
-.toolbar {
+/* Full-width secondary header — deliberately edge-to-edge rather than capped
+   at `.page`'s 900px, matching DocsHeader's own uncapped width one level up.
+   No sticky positioning of its own; `.stickyChrome` above supplies it. No
+   `border-bottom` here — when the toolbar bar is also present, `.toolbarBar`
+   supplies the one border at the bottom of the combined block, so the two
+   read as one continuous header rather than two separately-bordered strips
+   with a seam between them. When the toolbar isn't present (view mode,
+   Markdown view), `.secondaryHeader` is the last element in `.stickyChrome`
+   and needs its own edge — provided by `.stickyChrome` below instead of
+   duplicating it here, so it applies in both cases without doubling up when
+   the toolbar bar *is* present. */
+.secondaryHeader {
+  flex-shrink: 0;
+  background: var(--sv-color-surface);
+  padding: 0;
+}
+
+/* Full-width toolbar bar (RichTextEditor.tsx's formatting ribbon portals
+   into this), directly beneath `.secondaryHeader` inside the same
+   `.stickyChrome` wrapper — only rendered while editing in Rich text.
+   Horizontal padding matches `.secondaryHeader`'s own so the first button
+   lines up under the header's content, not its raw edge. No `border-top`
+   (would double up with `.stickyChrome`'s own bottom border when both are
+   present) — this is the block's closing edge, not an internal divider. */
+.toolbarBar {
+  padding: var(--sv-space-2) var(--sv-space-6);
+  background: var(--sv-color-surface);
+  border-top: 1px solid var(--sv-color-border);
+}
+
+/* Single-row doc chrome: back arrow, title + status, mode controls — merges
+   what used to be two separate rows (see the "closing the gap with Google
+   Docs" strategy doc, Strategy A). No max-width of its own — stretches to
+   fill `.secondaryHeader`'s full width, same as DocsHeader's own left/right
+   groups. */
+.metaBar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--sv-space-4);
+  gap: var(--sv-space-1);
   flex-wrap: wrap;
+  padding: var(--sv-space-3) var(--sv-space-3) var(--sv-space-3) var(--sv-space-2);
 }
 
 .backLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--sv-radius-sm);
   color: var(--sv-color-text-muted);
-  font-size: var(--sv-font-size-sm);
   text-decoration: none;
 }
 
 .backLink:hover {
+  background: var(--sv-color-surface-sunken);
   color: var(--sv-color-text-primary);
 }
 
-.status {
+/* Title + status inline on one line (not stacked) — deliberately NOT
+   `display: flex` here. `display: flex; flex-direction: row` on this
+   specific element (direct ancestor of the title `<input>`, two levels up
+   through `.titleInputWrap`) reproduces a genuine Chromium rendering bug:
+   the input's text stops painting entirely — value, layout box, hit-testing,
+   computed `color`, and every other CSSOM signal all report correctly, the
+   glyphs just never rasterize. Confirmed by bisection, one property at a
+   time: `flex-direction: column` avoids it, `display: block` avoids it,
+   `display: flex; flex-direction: row` reproduces it regardless of
+   `align-items`/`gap`/what's inside. Not sticky positioning, not the
+   negative margin on `.title` alone, not color, not font-loading — only
+   this element actually being a row-direction flex container. Using
+   `display: block` + inline-block children below instead sidesteps the bug
+   entirely while still reading as one line. */
+.titleBlock {
+  flex: 1 1 auto;
+  min-width: 160px;
+}
+
+/* Invisible, off-screen, exists purely to be measured — see the
+   `titleMirrorRef` comment in DocumentPage.tsx. Every property that affects
+   rendered text width must match `.title` exactly: font metrics, padding,
+   and border (an input's `box-sizing: border-box`, from packages/ui, means
+   padding/border eat into `width`, so the mirror needs them too or the
+   measured width would be text-only and the input would render too narrow
+   to fit its own padding). `position: fixed` (not `absolute`) takes it out
+   of flow relative to the viewport rather than the nearest positioned
+   ancestor — `.titleBlock` isn't `position: relative`, so `absolute` here
+   would resolve against whatever positioned ancestor happens to exist
+   further up the tree, which is fragile to unrelated layout changes.
+   `white-space: pre` mirrors a single-line input's own text rendering — no
+   wrapping, no collapsed whitespace. */
+.titleMirror {
+  position: fixed;
+  top: -9999px;
+  left: -9999px;
+  visibility: hidden;
+  white-space: pre;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  padding: 2px var(--sv-space-2);
+  font-size: var(--sv-font-size-xl);
+  font-weight: var(--sv-font-weight-semibold);
+}
+
+/* `inline-block` (not a flex item) — see `.titleBlock` above for why. Width
+   is set inline per-render from `.titleMirror`'s measurement
+   (DocumentPage.tsx) — on *this* element, not the `<input>` inside it. It
+   has to live here: a `width` set directly on the input combined with
+   `max-width: 100%` on that same input produced a genuine ~16px
+   under-measurement (circular sizing between a percentage `max-width`, the
+   input's own shrink-to-fit-adjacent box, and `.title`'s negative margin —
+   see that rule's own comment) — clipping title text that had room to
+   render. Putting the explicit `width` here instead, on a plain box with no
+   negative margin of its own, means the input underneath can go back to
+   its ordinary `width: 100%` (packages/ui's default) with nothing circular
+   to resolve. `max-width: 100%` is the actual overflow backstop against
+   `.titleBlock`'s real (flex-computed, non-circular) width — without it, a
+   long title's explicit pixel width here doesn't shrink on a narrow
+   viewport just because `.titleBlock` is narrower; a fixed `width` and a
+   `max-width` do different jobs, and the input never had the second one
+   before this element existed to hold it. */
+.titleInputWrap {
+  display: inline-block;
+  vertical-align: middle;
+  max-width: 100%;
+}
+
+/* Matches Google Docs' own title affordance: plain text at rest, a subtle
+   bordered box appears only on hover/focus while editable — not a flat gray
+   fill. `border`/`background` are set again below under `:read-only`
+   because `Input`'s own base styles (packages/ui) apply `:read-only`
+   background/border rules with the same class+pseudo-class specificity as a
+   plain `.title` rule here — equal specificity falls back to source order,
+   which isn't reliable to depend on across bundles, so both states are
+   spelled out explicitly rather than assumed to win by default. The small
+   negative margin offsets the padding added for the hover border's own
+   breathing room, so the text sits in the same place it did before either
+   was added — no layout shift when the border appears. No `width` override
+   here — sizing lives on `.titleInputWrap` above (see that rule's comment
+   for why), so this just keeps `Input`'s own default `width: 100%`
+   (packages/ui), filling whatever the wrapper is sized to. `text-overflow:
+   ellipsis` covers the genuinely-not-enough-room case (a long title on a
+   narrow viewport, once `.titleInputWrap`'s `max-width: 100%` has clamped
+   it below what the title needs) with a graceful truncation instead of an
+   abrupt hard clip — `overflow-x: clip` is a plain input's own default, not
+   a truncation indicator. See this file's comment at the wrapper's JSX call
+   site for why this input specifically can't be a flex item of a
+   row-direction container. */
+.title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid transparent;
+  border-radius: var(--sv-radius-sm);
+  padding: 2px var(--sv-space-2);
+  margin: -2px calc(-1 * var(--sv-space-2));
+  font-size: var(--sv-font-size-xl);
+  font-weight: var(--sv-font-weight-semibold);
+  background: transparent;
+}
+
+.title:focus {
+  outline: none;
+}
+
+/* `box-shadow: none` overrides `Input`'s own `:focus-visible` rule
+   (packages/ui), which applies a 2px accent-colored ring — correct for a
+   real form field, too heavy for a Google-Docs-style "this is editable"
+   hint, which is just the thin border below. */
+.title:not(:read-only):hover,
+.title:not(:read-only):focus {
+  border-color: var(--sv-color-border);
+  box-shadow: none;
+  cursor: text;
+}
+
+.title:read-only {
+  background: transparent;
+  color: var(--sv-color-text-primary);
+  border-color: transparent;
+  cursor: default;
+}
+
+/* `display: inline` (not a flex sibling — see `.titleBlock` above) so this
+   sits directly on the same line as the title input rather than dropping
+   to its own line, a `<p>`'s block-level default. */
+.statusLine {
+  display: inline;
+  white-space: nowrap;
+  margin: 0 0 0 var(--sv-space-2);
+  font-size: var(--sv-font-size-caption);
+  color: var(--sv-color-text-muted);
+}
+
+/* `max-width: 100%` (not just `flex-wrap: wrap`) is what actually makes the
+   wrap do anything — `flex: none` means this never shrinks below its own
+   content's natural width on its own, so on a narrow viewport it was
+   rendering at its full ~420px (Markdown/Rich text + View/Edit + Download +
+   Share, all in one row) regardless of how little room `.metaBar` actually
+   gave it, invisibly overflowing past the viewport edge with no scrollbar
+   (something in an ancestor clips horizontal overflow) — Share, the last
+   button, ended up literally untappable on a real phone-width screen.
+   `max-width: 100%` lets the browser actually constrain this box to
+   `.metaBar`'s real available width, which is what makes `flex-wrap: wrap`
+   have anything to do — the buttons wrap across rows instead of overflowing
+   off-screen. */
+.metaRight {
   display: flex;
   align-items: center;
-  gap: var(--sv-space-3);
-  font-size: var(--sv-font-size-sm);
-  color: var(--sv-color-text-muted);
+  gap: var(--sv-space-2);
   flex-wrap: wrap;
+  flex: none;
+  max-width: 100%;
 }
 
-.badge {
-  padding: 0 var(--sv-space-2);
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
   border-radius: var(--sv-radius-sm);
-  border: 1px solid var(--sv-color-border);
+  background: transparent;
+  color: var(--sv-color-text-muted);
+  cursor: pointer;
 }
 
-.autosaveStatus {
-  white-space: nowrap;
+.iconButton:hover {
+  background: var(--sv-color-surface-sunken);
+  color: var(--sv-color-text-primary);
 }
 
+/* The real `useActionState`-bound Sync-to-Git submission target — never
+   shown; the overflow menu's "Sync to Git" item triggers it via
+   `requestSubmit()`. `display: none` (not visually-hidden-but-present) is
+   fine here since nothing needs to read its layout box or focus into it. */
+.hiddenForm {
+  display: none;
+}
+
+/* `.page`'s old max-width wrapper is gone (`.canvas` below is deliberately
+   full-bleed now), so this owns its own reading-width cap rather than
+   inheriting one from a shared ancestor. */
 .syncError {
-  margin: 0;
+  max-width: 900px;
+  margin: var(--sv-space-4) auto 0;
   font-size: var(--sv-font-size-sm);
   padding: var(--sv-space-2) var(--sv-space-3);
   border-radius: var(--sv-radius-md);
@@ -54,29 +275,59 @@
   color: var(--sv-color-error-text);
 }
 
-.title {
-  border: none;
-  padding: 0;
-  font-size: var(--sv-font-size-2xl);
-  font-weight: 600;
-  background: transparent;
+/* Sunken "desk" the page sits on — full browser width (no `border-radius`;
+   a rounded corner only reads correctly on an inset box, and this one now
+   runs edge-to-edge like DocsHeader/`.secondaryHeader` above it), matching
+   Google Docs' own canvas: the grey surface spans the whole viewport, only
+   the white page/`.pageCard` inside it is centered at a reading width. */
+.canvas {
+  background: var(--sv-color-surface-sunken);
+  padding: var(--sv-space-8) var(--sv-space-4);
 }
 
-.title:focus {
-  outline: none;
+/* Sized to real legal paper (216 × 356mm — physical CSS units, not a px
+   approximation, so it's exactly what "legal size" means regardless of the
+   browser's own px-per-inch reference). `max-width`, not a bare `width`,
+   so it still shrinks to fit a narrower viewport the same way the old
+   720px cap did — deliberately just the page's proportions, not real
+   pagination: `min-height` reserves a full page's worth of height (the
+   generous Google-Docs-style bottom whitespace below short content) but
+   places no matching max-height/page-break — content past one legal
+   page's length keeps growing this single element rather than splitting
+   into multiple page rectangles. */
+.pageCard {
+  max-width: 216mm;
+  min-height: 356mm;
+  margin-inline: auto;
+  background: var(--sv-color-surface-raised);
+  border: 1px solid var(--sv-color-border);
+  border-radius: var(--sv-radius-md);
+  box-shadow: var(--sv-shadow-card);
 }
 
 .body {
-  flex: 1;
-  min-height: 60vh;
+  display: block;
+  width: 100%;
+  min-height: 420px;
   border: none;
-  padding: 0;
+  padding: var(--sv-space-8);
   resize: vertical;
   font-size: var(--sv-font-size-md);
-  line-height: 1.6;
+  line-height: 1.7;
   background: transparent;
 }
 
 .body:focus {
   outline: none;
+}
+
+@media (max-width: 640px) {
+  .canvas {
+    padding: var(--sv-space-4) 0;
+  }
+  .pageCard {
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+  }
 }

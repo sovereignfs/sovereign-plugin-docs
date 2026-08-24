@@ -94,12 +94,37 @@ export const docsDocumentMembers = sqliteTable(
   ],
 );
 
+/**
+ * Project-level sharing (mirrors `docs_document_members`'s shape, not
+ * Kanban's `kanban_project_members` — Docs' own house style enum-
+ * constrains `role` on SQLite and keeps the redundant explicit unique
+ * index alongside the composite PK). A project role also gates access to
+ * every document filed under that project (the "shared folder" model) —
+ * see `resolveDocumentAccess()` in `_lib/documents.ts`.
+ */
+export const docsProjectMembers = sqliteTable(
+  'docs_project_members',
+  {
+    projectId: text('project_id').notNull(),
+    userId: text('user_id').notNull(),
+    tenantId: text('tenant_id').notNull(),
+    role: text('role', { enum: ['owner', 'editor', 'viewer'] }).notNull(),
+    invitedBy: text('invited_by'),
+    joinedAt: integer('joined_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.userId] }),
+    uniqueIndex('docs_project_members_project_user_idx').on(t.projectId, t.userId),
+  ],
+);
+
 export const docsTables = {
   docsDrives,
   docsProjects,
   docsDocuments,
   docsUserPrefs,
   docsDocumentMembers,
+  docsProjectMembers,
 };
 
 export type DocsDrive = InferSelectModel<typeof docsDrives>;
@@ -107,8 +132,10 @@ export type DocsProject = InferSelectModel<typeof docsProjects>;
 export type DocsDocument = InferSelectModel<typeof docsDocuments>;
 export type DocsUserPrefs = InferSelectModel<typeof docsUserPrefs>;
 export type DocsDocumentMember = InferSelectModel<typeof docsDocumentMembers>;
+export type DocsProjectMember = InferSelectModel<typeof docsProjectMembers>;
 export type NewDocsDrive = InferInsertModel<typeof docsDrives>;
 export type NewDocsProject = InferInsertModel<typeof docsProjects>;
 export type NewDocsDocument = InferInsertModel<typeof docsDocuments>;
 export type NewDocsUserPrefs = InferInsertModel<typeof docsUserPrefs>;
 export type NewDocsDocumentMember = InferInsertModel<typeof docsDocumentMembers>;
+export type NewDocsProjectMember = InferInsertModel<typeof docsProjectMembers>;

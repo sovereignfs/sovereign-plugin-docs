@@ -12,6 +12,7 @@ import {
   docsDocumentMembers,
   docsDocuments,
   docsDrives,
+  docsProjectMembers,
   docsProjects,
   docsUserPrefs,
 } from '../_db/schema';
@@ -244,13 +245,26 @@ async function importDocsData(section: PluginExportSection, ctx: ImportContext):
   const originalProjectIds = new Set(data.projects.map((p) => p.id));
 
   for (const p of data.projects) {
+    const newProjectId = ctx.remapId(p.id);
     await db.insert(docsProjects).values({
-      id: ctx.remapId(p.id),
+      id: newProjectId,
       tenantId: ctx.tenantId,
       ownerId: ctx.userId,
       name: p.name,
       slug: p.slug,
       createdAt: p.createdAt,
+    });
+    // Every project needs an owner membership row to be reachable at all —
+    // getProjectOverview/listDocumentsOverview both read through
+    // docs_project_members, not ownerId directly (mirrors the document
+    // owner-membership insert below).
+    await db.insert(docsProjectMembers).values({
+      projectId: newProjectId,
+      userId: ctx.userId,
+      tenantId: ctx.tenantId,
+      role: 'owner',
+      invitedBy: null,
+      joinedAt: ts,
     });
   }
 
@@ -399,14 +413,126 @@ async function deleteAllDocsData(ctx: DeletionContext): Promise<DeletionResult> 
     }
   }
 
-  const projectRows = await db
-    .select({ id: docsProjects.id })
-    .from(docsProjects)
-    .where(and(eq(docsProjects.tenantId, ctx.tenantId), eq(docsProjects.ownerId, ctx.userId)));
-  await db
-    .delete(docsProjects)
-    .where(and(eq(docsProjects.tenantId, ctx.tenantId), eq(docsProjects.ownerId, ctx.userId)));
-  deleted += projectRows.length;
+  // Every project this user has a role on — owned or shared with them.
+  // Mirrors the per-document transfer logic above: a project this user
+  // doesn't own just loses their membership row; a project they do own
+  // gets handed to a successor member (preferring an existing project
+  // owner, else the earliest-joined member) so it survives its owner's
+  // account deletion, same as a shared document does.
+  const projectMemberships = await db
+    .select()
+    .from(docsProjectMembers)
+    .where(
+      and(eq(docsProjectMembers.tenantId, ctx.tenantId), eq(docsProjectMembers.userId, ctx.userId)),
+    );
+
+  for (const membership of projectMemberships) {
+    const [project] = await db
+      .select({ id: docsProjects.id, ownerId: docsProjects.ownerId })
+      .from(docsProjects)
+      .where(
+        and(eq(docsProjects.id, membership.projectId), eq(docsProjects.tenantId, ctx.tenantId)),
+      );
+
+    if (!project) {
+      // Dangling membership row with no project behind it.
+      await db
+        .delete(docsProjectMembers)
+        .where(
+          and(
+            eq(docsProjectMembers.tenantId, ctx.tenantId),
+            eq(docsProjectMembers.projectId, membership.projectId),
+            eq(docsProjectMembers.userId, ctx.userId),
+          ),
+        );
+      deleted += 1;
+      continue;
+    }
+
+    if (project.ownerId !== ctx.userId) {
+      // A share on someone else's project — just leave it.
+      await db
+        .delete(docsProjectMembers)
+        .where(
+          and(
+            eq(docsProjectMembers.tenantId, ctx.tenantId),
+            eq(docsProjectMembers.projectId, project.id),
+            eq(docsProjectMembers.userId, ctx.userId),
+          ),
+        );
+      deleted += 1;
+      continue;
+    }
+
+    const allMembers = await db
+      .select()
+      .from(docsProjectMembers)
+      .where(
+        and(
+          eq(docsProjectMembers.tenantId, ctx.tenantId),
+          eq(docsProjectMembers.projectId, project.id),
+        ),
+      );
+    const successors = allMembers.filter((m) => m.userId !== ctx.userId);
+
+    if (successors.length > 0) {
+      const promotee =
+        successors.find((m) => m.role === 'owner') ??
+        [...successors].sort((a, b) => a.joinedAt - b.joinedAt)[0];
+      if (promotee) {
+        await db
+          .update(docsProjects)
+          .set({ ownerId: promotee.userId })
+          .where(and(eq(docsProjects.id, project.id), eq(docsProjects.tenantId, ctx.tenantId)));
+        if (promotee.role !== 'owner') {
+          await db
+            .update(docsProjectMembers)
+            .set({ role: 'owner' })
+            .where(
+              and(
+                eq(docsProjectMembers.tenantId, ctx.tenantId),
+                eq(docsProjectMembers.projectId, project.id),
+                eq(docsProjectMembers.userId, promotee.userId),
+              ),
+            );
+        }
+      }
+      await db
+        .delete(docsProjectMembers)
+        .where(
+          and(
+            eq(docsProjectMembers.tenantId, ctx.tenantId),
+            eq(docsProjectMembers.projectId, project.id),
+            eq(docsProjectMembers.userId, ctx.userId),
+          ),
+        );
+      deleted += 1;
+    } else {
+      // Sole owner, no one else has access — nothing left to preserve.
+      // Reparent any documents still filed under it to root level first,
+      // so deleting the project doesn't leave a document pointing at a
+      // projectId that no longer exists (invisible: not on the root
+      // documents list, and its own project page 404s).
+      await db
+        .update(docsDocuments)
+        .set({ projectId: null })
+        .where(
+          and(eq(docsDocuments.tenantId, ctx.tenantId), eq(docsDocuments.projectId, project.id)),
+        );
+      await db
+        .delete(docsProjectMembers)
+        .where(
+          and(
+            eq(docsProjectMembers.tenantId, ctx.tenantId),
+            eq(docsProjectMembers.projectId, project.id),
+          ),
+        );
+      await db
+        .delete(docsProjects)
+        .where(and(eq(docsProjects.id, project.id), eq(docsProjects.tenantId, ctx.tenantId)));
+      deleted += 1;
+    }
+  }
 
   const driveRows = await db
     .select()

@@ -80,6 +80,7 @@ interface Store extends Record<string, Row[]> {
   docs_documents: Row[];
   docs_user_prefs: Row[];
   docs_document_members: Row[];
+  docs_project_members: Row[];
 }
 
 let store: Store = {
@@ -88,6 +89,7 @@ let store: Store = {
   docs_documents: [],
   docs_user_prefs: [],
   docs_document_members: [],
+  docs_project_members: [],
 };
 
 function resetStore() {
@@ -97,6 +99,7 @@ function resetStore() {
     docs_documents: [],
     docs_user_prefs: [],
     docs_document_members: [],
+    docs_project_members: [],
   };
 }
 
@@ -229,6 +232,12 @@ describe('portability import', () => {
     expect(store.docs_projects).toEqual([
       expect.objectContaining({ id: 'new-src-proj-1', ownerId: 'u2', tenantId: 't1' }),
     ]);
+    // An owner membership row is created — without it the project would be
+    // unreachable (getProjectOverview/listDocumentsOverview both read
+    // through docs_project_members, not ownerId directly).
+    expect(store.docs_project_members).toEqual([
+      expect.objectContaining({ projectId: 'new-src-proj-1', userId: 'u2', role: 'owner' }),
+    ]);
     // A git-backed document is imported as local (its remote mirror is not re-created), content preserved.
     expect(store.docs_documents).toEqual([
       expect.objectContaining({
@@ -291,15 +300,27 @@ describe('portability delete', () => {
       { documentId: 'doc-3', userId: 'u1', tenantId: 't1', role: 'viewer', invitedBy: 'other', joinedAt: 1 },
       { documentId: 'doc-3', userId: 'other', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
     ];
+    // u1 is proj-1's sole project member (no successor) — deleting u1 hard-
+    // deletes the project, same as before docs_project_members existed.
+    store.docs_project_members = [
+      { projectId: 'proj-1', userId: 'u1', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
+    ];
 
     const result = await capturedDeleter.fn?.({ userId: 'u1', tenantId: 't1', db: fakeDb });
     expect(result).toBeDefined();
 
     expect(store.docs_projects).toEqual([]);
+    expect(store.docs_project_members).toEqual([]);
     // doc-1 survives, transferred to its remaining member ('other') instead of being deleted.
     // doc-2 (sole owner, no other members) is hard-deleted. doc-3 (not owned by u1) is untouched.
     expect(store.docs_documents.map((d) => d.id).sort()).toEqual(['doc-1', 'doc-3']);
-    expect(store.docs_documents.find((d) => d.id === 'doc-1')).toMatchObject({ ownerId: 'other' });
+    // doc-1's new owner ('other') has no docs_project_members role on proj-1,
+    // and proj-1 has no successor and is hard-deleted — doc-1 is reparented
+    // to root level rather than left pointing at a deleted project.
+    expect(store.docs_documents.find((d) => d.id === 'doc-1')).toMatchObject({
+      ownerId: 'other',
+      projectId: null,
+    });
     expect(store.docs_document_members).toEqual([
       expect.objectContaining({ documentId: 'doc-1', userId: 'other', role: 'owner' }),
       expect.objectContaining({ documentId: 'doc-3', userId: 'other', role: 'owner' }),

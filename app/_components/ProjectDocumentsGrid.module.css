@@ -1,0 +1,15 @@
+.tileLabel {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sv-color-text-primary);
+  font-weight: 500;
+}
+
+.tileBadge {
+  display: block;
+  margin-top: var(--sv-space-1);
+  font-size: var(--sv-font-size-xs);
+  color: var(--sv-color-text-muted);
+}

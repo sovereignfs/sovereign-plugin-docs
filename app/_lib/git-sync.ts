@@ -3,11 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { sdk } from '@sovereignfs/sdk';
 import { and, eq } from 'drizzle-orm';
-import { docsDocumentMembers, docsDocuments, docsProjects } from '../_db/schema';
+import { docsDocuments, docsProjects } from '../_db/schema';
 import { getDrive } from './actions';
 import type { ActionResult } from './context';
 import { getContext, now } from './context';
 import { buildGitPath, canEditRole } from './document-rules';
+import { resolveDocumentRole } from './documents';
 import { sanitizeError } from './drive-rules';
 import { getGitProvider, GitProviderError, type GitCommit, type GitRepoRef } from './git-providers';
 
@@ -39,21 +40,6 @@ async function resolveGitContext(
 > {
   const { db, userId, tenantId } = await getContext();
 
-  const [membership] = await db
-    .select({ role: docsDocumentMembers.role })
-    .from(docsDocumentMembers)
-    .where(
-      and(
-        eq(docsDocumentMembers.documentId, documentId),
-        eq(docsDocumentMembers.tenantId, tenantId),
-        eq(docsDocumentMembers.userId, userId),
-      ),
-    );
-  if (!membership) return { ok: false, error: 'Document not found.' };
-  if (requireEdit && !canEditRole(membership.role)) {
-    return { ok: false, error: "You don't have permission to sync this document." };
-  }
-
   const [doc] = await db
     .select({
       id: docsDocuments.id,
@@ -68,6 +54,12 @@ async function resolveGitContext(
     .from(docsDocuments)
     .where(and(eq(docsDocuments.id, documentId), eq(docsDocuments.tenantId, tenantId)));
   if (!doc) return { ok: false, error: 'Document not found.' };
+
+  const role = await resolveDocumentRole(db, tenantId, userId, documentId, doc.projectId);
+  if (!role) return { ok: false, error: 'Document not found.' };
+  if (requireEdit && !canEditRole(role)) {
+    return { ok: false, error: "You don't have permission to sync this document." };
+  }
 
   const drive = await getDrive();
   if (!drive || drive.status !== 'connected') {
