@@ -1,7 +1,10 @@
+/* Assumes it's mounted inside a container that already supplies its own
+   outer border/card treatment (DocumentPage's page-canvas) — this component
+   owns the prose typography (plus the ribbon's own button layout, portaled
+   elsewhere — see this file's top comment) only, not the surrounding
+   chrome, so the same page-canvas card looks identical across the
+   read-only viewer, the Markdown textarea, and this WYSIWYG view. */
 .shell {
-  border: 1px solid var(--sv-color-border);
-  border-radius: var(--sv-radius-md);
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -14,14 +17,14 @@
   font-size: var(--sv-font-size-sm);
 }
 
+/* Button layout only — padding, background, border, and sticky positioning
+   all live on DocumentPage.module.css's `.toolbarBar` instead, the actual
+   portal target this renders into (see this file's top comment). */
 .toolbar {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
-  padding: var(--sv-space-2);
-  border-bottom: 1px solid var(--sv-color-border);
-  background: var(--sv-color-surface-sunken);
 }
 
 .divider {
@@ -33,6 +36,9 @@
 
 .toolbarButton,
 .toolbarButtonActive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: var(--sv-radius-sm);
   background: transparent;
@@ -41,17 +47,18 @@
   font: inherit;
   font-size: var(--sv-font-size-sm);
   font-weight: var(--sv-font-weight-semibold);
-  min-width: 28px;
-  padding: var(--sv-space-1) var(--sv-space-2);
+  width: 28px;
+  height: 28px;
+  padding: 0;
 }
 
 .toolbarButton:hover:not(:disabled) {
-  background: var(--sv-color-surface);
+  background: var(--sv-color-surface-sunken);
   color: var(--sv-color-text-primary);
 }
 
 .toolbarButtonActive {
-  background: var(--sv-color-surface);
+  background: var(--sv-color-surface-sunken);
   color: var(--sv-color-text-primary);
   box-shadow: inset 0 0 0 1px var(--sv-color-border-strong);
 }
@@ -62,27 +69,116 @@
   opacity: 0.5;
 }
 
+/* Paragraph-style menu trigger — same 28px-tall control family as the icon
+   buttons either side of it, but text-width rather than square. */
+.styleTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sv-space-1);
+  height: 28px;
+  padding: 0 var(--sv-space-2);
+  border: none;
+  border-radius: var(--sv-radius-sm);
+  background: transparent;
+  color: var(--sv-color-text-primary);
+  font: inherit;
+  font-size: var(--sv-font-size-sm);
+  cursor: pointer;
+}
+
+.styleTrigger:hover:not(:disabled) {
+  background: var(--sv-color-surface-sunken);
+}
+
+.styleTrigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .content {
   flex: 1 1 auto;
 }
 
 .prose {
-  min-height: 460px;
-  padding: var(--sv-space-4);
+  min-height: 420px;
+  padding: var(--sv-space-12);
   color: var(--sv-color-text-primary);
   font-size: var(--sv-font-size-md);
   line-height: 1.7;
   outline: none;
 }
 
+/* `.prose`'s own padding (equal on all four sides) prevents the usual
+   parent/first-child margin-collapse — without this, the first block's own
+   top margin (e.g. a leading `h1`'s `--sv-space-6`) stacks on top of the
+   padding instead of collapsing into it, so the top edge reads with
+   noticeably more whitespace than left/right/bottom even though the padding
+   itself is uniform. Same reasoning for the last block's bottom margin. */
+.prose > :global(*:first-child) {
+  margin-top: 0;
+}
+
+.prose > :global(*:last-child) {
+  margin-bottom: 0;
+}
+
+/* Google Docs' real default "Normal text" style does carry space-after-
+   paragraph (confirmed against the petition.lk reference doc: genuine
+   paragraph breaks get a visible gap, distinct from a same-paragraph
+   soft-wrapped line, which only line-height spaces). An earlier pass here
+   set this to `margin: 0`, reasoning from a different comparison (several
+   short, consecutive Enter-created lines sitting flush in Google Docs) —
+   revisited because that tight case is what Shift+Enter (a same-paragraph
+   `<br>`, unaffected by this margin either way) produces, not plain Enter. */
 .prose :global(p) {
   margin: 0 0 var(--sv-space-3);
 }
 
-.prose :global(h1),
-.prose :global(h2),
+/* A real size scale (the browser's own h1/h2/h3 UA defaults otherwise apply
+   instead — no deliberate hierarchy, and too close to `--sv-font-size-md`
+   body text to read as a heading at all) — mapped onto the existing DS
+   scale rather than inventing new tokens, matching a numbered-section
+   document like Google Docs' own Heading 1/2/3 styles. */
+.prose :global(h1) {
+  margin: var(--sv-space-6) 0 var(--sv-space-3);
+  font-size: var(--sv-font-size-2xl);
+  font-weight: var(--sv-font-weight-bold);
+  line-height: 1.3;
+}
+
+.prose :global(h2) {
+  margin: var(--sv-space-5) 0 var(--sv-space-2);
+  font-size: var(--sv-font-size-xl);
+  font-weight: var(--sv-font-weight-bold);
+  line-height: 1.3;
+}
+
 .prose :global(h3) {
   margin: var(--sv-space-4) 0 var(--sv-space-2);
+  font-size: var(--sv-font-size-lg);
+  font-weight: var(--sv-font-weight-semibold);
+  line-height: 1.3;
+}
+
+/* "Title"/"Subtitle" (PARAGRAPH_STYLES levels 4/5 in RichTextEditor.tsx —
+   see that file's comment for why they live at those levels rather than 1/2).
+   Title reads bigger than Heading 1 despite nominally being a deeper
+   markdown heading — visual size here is a plain CSS choice, decoupled from
+   the heading-level number. Subtitle sits close beneath it (no top margin)
+   and reads as de-emphasized body text, not another heading, matching
+   Google Docs' own muted, regular-weight Subtitle style. */
+.prose :global(h4) {
+  margin: var(--sv-space-6) 0 var(--sv-space-2);
+  font-size: var(--sv-font-size-3xl);
+  font-weight: var(--sv-font-weight-bold);
+  line-height: 1.2;
+}
+
+.prose :global(h5) {
+  margin: 0 0 var(--sv-space-5);
+  font-size: var(--sv-font-size-xl);
+  font-weight: var(--sv-font-weight-regular);
+  color: var(--sv-color-text-muted);
   line-height: 1.3;
 }
 
@@ -92,6 +188,26 @@
   padding-left: var(--sv-space-6);
 }
 
+/* Breathing room between list items — a plain UA-default list (no margin
+   between `li`s) reads as cramped next to real paragraph text; this
+   matches the visible gap between bullets in a Google Docs list. */
+.prose :global(li) {
+  margin-bottom: var(--sv-space-2);
+}
+
+.prose :global(li:last-child) {
+  margin-bottom: 0;
+}
+
+/* Section divider — a plain 1px rule, not the browser's own default
+   inset/outset 2px ridge, with generous vertical margin so it reads as a
+   deliberate section break rather than a stray line. */
+.prose :global(hr) {
+  margin: var(--sv-space-6) 0;
+  border: none;
+  border-top: 1px solid var(--sv-color-border);
+}
+
 .prose :global(code) {
   border-radius: var(--sv-radius-sm);
   background: var(--sv-color-surface-sunken);
@@ -99,6 +215,64 @@
   padding: 0 var(--sv-space-1);
 }
 
+/* Code block (fenced ```) — reachable via typed/pasted Markdown even though
+   the toolbar has no dedicated button for it; StarterKit bundles the
+   extension. `pre` owns the container styling; the nested `code` (its own
+   `.prose :global(code)` rule above) is reset here so a multi-line block
+   doesn't inherit the inline mark's padding/background twice. */
+.prose :global(pre) {
+  margin: 0 0 var(--sv-space-3);
+  padding: var(--sv-space-3) var(--sv-space-4);
+  border-radius: var(--sv-radius-md);
+  background: var(--sv-color-surface-sunken);
+  overflow-x: auto;
+}
+
+.prose :global(pre code) {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  white-space: pre;
+}
+
 .prose :global(a) {
   color: var(--sv-color-accent);
+}
+
+/* `@tiptap/extension-table` renders its own `.tableWrapper` div around the
+   `<table>` (`addNodeView`, in both editable and read-only editor instances
+   — this component's read-only viewer is still a live non-editable
+   ProseMirror `EditorView`, not a static HTML render, so the NodeView still
+   applies) — this is the scroll container for a table wider than the page,
+   matching every other wide-content block in this codebase (`pre` above).
+   Only `.tableWrapper` scrolls; the surrounding prose column does not. */
+.prose :global(.tableWrapper) {
+  margin: 0 0 var(--sv-space-3);
+  overflow-x: auto;
+}
+
+.prose :global(table) {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.prose :global(th),
+.prose :global(td) {
+  border: 1px solid var(--sv-color-border);
+  padding: var(--sv-space-2) var(--sv-space-3);
+  text-align: left;
+  vertical-align: top;
+}
+
+.prose :global(th) {
+  background: var(--sv-color-surface-sunken);
+  font-weight: var(--sv-font-weight-semibold);
+}
+
+/* `tableEditing`'s cell-selection plugin (drag or Shift-click across
+   cells) tags each selected `td`/`th` with this class — with no styling
+   here a multi-cell selection is invisible, reading as broken rather than
+   just unstyled. */
+.prose :global(.selectedCell) {
+  background: var(--sv-color-accent-subtle);
 }

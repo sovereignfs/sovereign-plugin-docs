@@ -18,11 +18,6 @@
   color: var(--sv-color-text-muted);
 }
 
-.actions {
-  display: flex;
-  gap: var(--sv-space-2);
-}
-
 .search {
   max-width: 360px;
 }
@@ -40,11 +35,24 @@
   color: var(--sv-color-text-muted);
 }
 
-.grid {
-  list-style: none;
+.groupEmpty {
   margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: var(--sv-space-3);
+  font-size: var(--sv-font-size-sm);
+  color: var(--sv-color-text-subtle);
+}
+
+.tileLabel {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sv-color-text-primary);
+  font-weight: 500;
+}
+
+.tileBadge {
+  display: block;
+  margin-top: var(--sv-space-1);
+  font-size: var(--sv-font-size-xs);
+  color: var(--sv-color-text-muted);
 }

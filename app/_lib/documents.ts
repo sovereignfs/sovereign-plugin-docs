@@ -1,11 +1,15 @@
 'use server';
 
-import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
-import { docsDocumentMembers, docsDocuments, docsProjects } from '../_db/schema';
+import {
+  docsDocumentMembers,
+  docsDocuments,
+  docsProjectMembers,
+  docsProjects,
+} from '../_db/schema';
 import { getDrive, type DriveView } from './actions';
-import type { ActionResult } from './context';
+import type { ActionResult, Db } from './context';
 import { getContext, now } from './context';
 import {
   DEFAULT_DOCUMENT_TITLE,
@@ -14,10 +18,73 @@ import {
   resolveDocumentStorage,
   slugify,
   uniqueSlug,
+  type DocumentMemberRole,
 } from './document-rules';
+import { newId } from './ids';
+import { canEditProjectRole, type ProjectMemberRole } from './project-rules';
 import { getFreeDocLimit } from './quota';
 
 export type { ActionResult };
+
+/**
+ * Resolves the current user's role on a project via `docs_project_members`.
+ * `docs_projects.ownerId` is no longer consulted directly — every project
+ * (including ones created before this table existed) has a matching owner
+ * membership row via the creation-time insert below or the migration's
+ * backfill, so the membership table is the single source of truth.
+ */
+async function resolveProjectRole(
+  db: Db,
+  tenantId: string,
+  userId: string,
+  projectId: string,
+): Promise<ProjectMemberRole | null> {
+  const [membership] = await db
+    .select({ role: docsProjectMembers.role })
+    .from(docsProjectMembers)
+    .where(
+      and(
+        eq(docsProjectMembers.projectId, projectId),
+        eq(docsProjectMembers.tenantId, tenantId),
+        eq(docsProjectMembers.userId, userId),
+      ),
+    );
+  return membership?.role ?? null;
+}
+
+/**
+ * Resolves the current user's effective role on a document: a direct
+ * `docs_document_members` row, else — if the document is filed under a
+ * project — their `docs_project_members` role for that project (the
+ * "shared folder" model: sharing a project grants access to every document
+ * already filed under it, at that role, with no separate per-document share
+ * required). This does **not** extend to managing the document's own
+ * sharing — that stays gated to a direct `docs_document_members` owner row,
+ * see `sharing.ts`'s `requireOwner`.
+ */
+export async function resolveDocumentRole(
+  db: Db,
+  tenantId: string,
+  userId: string,
+  documentId: string,
+  projectId: string | null,
+): Promise<DocumentMemberRole | null> {
+  const [membership] = await db
+    .select({ role: docsDocumentMembers.role })
+    .from(docsDocumentMembers)
+    .where(
+      and(
+        eq(docsDocumentMembers.documentId, documentId),
+        eq(docsDocumentMembers.tenantId, tenantId),
+        eq(docsDocumentMembers.userId, userId),
+      ),
+    );
+  if (membership) return membership.role;
+  if (!projectId) return null;
+
+  const projectRole = await resolveProjectRole(db, tenantId, userId, projectId);
+  return projectRole;
+}
 
 export async function createProject(
   _prevState: ActionResult | null,
@@ -38,13 +105,25 @@ export async function createProject(
     new Set(existing.map((row) => row.slug)),
   );
 
+  const id = newId();
+  const ts = now();
+
   await db.insert(docsProjects).values({
-    id: randomUUID(),
+    id,
     tenantId,
     ownerId: userId,
     name,
     slug,
-    createdAt: now(),
+    createdAt: ts,
+  });
+
+  await db.insert(docsProjectMembers).values({
+    projectId: id,
+    userId,
+    tenantId,
+    role: 'owner',
+    invitedBy: null,
+    joinedAt: ts,
   });
 
   revalidatePath('/');
@@ -66,15 +145,13 @@ export async function createDocument(
     const rows = await db
       .select({ id: docsProjects.id, slug: docsProjects.slug })
       .from(docsProjects)
-      .where(
-        and(
-          eq(docsProjects.id, projectIdInput),
-          eq(docsProjects.tenantId, tenantId),
-          eq(docsProjects.ownerId, userId),
-        ),
-      );
-    project = rows[0] ?? null;
-    if (!project) return { ok: false, error: 'Project not found.' };
+      .where(and(eq(docsProjects.id, projectIdInput), eq(docsProjects.tenantId, tenantId)));
+    const found = rows[0] ?? null;
+    if (!found) return { ok: false, error: 'Project not found.' };
+
+    const role = await resolveProjectRole(db, tenantId, userId, found.id);
+    if (!role || !canEditProjectRole(role)) return { ok: false, error: 'Project not found.' };
+    project = found;
   }
 
   const drive = await getDrive();
@@ -97,12 +174,14 @@ export async function createDocument(
   const decision = resolveDocumentStorage(requestedStorage, dbCount, limit, driveConnected);
   if (!decision.ok) return decision;
 
+  // A project's slug is scoped across every contributor (not just this
+  // user's own documents) now that project sharing lets more than one
+  // owner ever create documents in it — a collision would mean two
+  // documents racing for the same git path (`buildGitPath`) once synced.
+  // Root-level (no project) documents stay scoped per-owner, unchanged —
+  // they're inherently private, not siblings in any shared listing.
   const slugFilter = project
-    ? and(
-        eq(docsDocuments.tenantId, tenantId),
-        eq(docsDocuments.ownerId, userId),
-        eq(docsDocuments.projectId, project.id),
-      )
+    ? and(eq(docsDocuments.tenantId, tenantId), eq(docsDocuments.projectId, project.id))
     : and(
         eq(docsDocuments.tenantId, tenantId),
         eq(docsDocuments.ownerId, userId),
@@ -114,7 +193,7 @@ export async function createDocument(
     .where(slugFilter);
   const slug = uniqueSlug(slugify(title), new Set(existingSlugs.map((row) => row.slug)));
 
-  const id = randomUUID();
+  const id = newId();
   const ts = now();
   const isGit = decision.storage === 'git';
 
@@ -149,7 +228,7 @@ export async function createDocument(
 }
 
 export interface DocumentsOverview {
-  projects: { id: string; name: string; slug: string }[];
+  projects: { id: string; name: string; slug: string; role: ProjectMemberRole }[];
   documents: {
     id: string;
     title: string;
@@ -178,15 +257,25 @@ export interface DocumentsOverview {
  * from actual ownership: `docs_documents.ownerId` is fixed at creation, but
  * a shared member can hold any role (including 'owner') without becoming
  * the row's owner.
+ *
+ * Projects are read the same way through `docs_project_members`, so a
+ * project shared with this user surfaces here too, each carrying its
+ * resolved `role` for the home page's "My projects"/"Shared with me" split.
+ * `documents` deliberately stays root-level-owned + individually-shared
+ * only — a document reachable purely via project role (the "shared folder"
+ * fallback in `resolveDocumentRole`) is browsable by opening the project,
+ * not flattened into this top-level list.
  */
 export async function listDocumentsOverview(drive: DriveView | null): Promise<DocumentsOverview> {
   const { db, userId, tenantId } = await getContext();
 
-  const [projects, memberships] = await Promise.all([
+  const [projectMemberships, documentMemberships] = await Promise.all([
     db
-      .select({ id: docsProjects.id, name: docsProjects.name, slug: docsProjects.slug })
-      .from(docsProjects)
-      .where(and(eq(docsProjects.tenantId, tenantId), eq(docsProjects.ownerId, userId))),
+      .select({ projectId: docsProjectMembers.projectId, role: docsProjectMembers.role })
+      .from(docsProjectMembers)
+      .where(
+        and(eq(docsProjectMembers.tenantId, tenantId), eq(docsProjectMembers.userId, userId)),
+      ),
     db
       .select({ documentId: docsDocumentMembers.documentId })
       .from(docsDocumentMembers)
@@ -195,7 +284,22 @@ export async function listDocumentsOverview(drive: DriveView | null): Promise<Do
       ),
   ]);
 
-  const documentIds = memberships.map((membership) => membership.documentId);
+  const projectIds = projectMemberships.map((membership) => membership.projectId);
+  const projectRows =
+    projectIds.length > 0
+      ? await db
+          .select({ id: docsProjects.id, name: docsProjects.name, slug: docsProjects.slug })
+          .from(docsProjects)
+          .where(and(eq(docsProjects.tenantId, tenantId), inArray(docsProjects.id, projectIds)))
+      : [];
+  const projectRoleById = new Map(projectMemberships.map((m) => [m.projectId, m.role]));
+  const projects = projectRows.map((project) => ({
+    ...project,
+    // Always present — every row here came from a membership row above.
+    role: projectRoleById.get(project.id) ?? 'viewer',
+  }));
+
+  const documentIds = documentMemberships.map((membership) => membership.documentId);
   const documentRows =
     documentIds.length > 0
       ? await db
@@ -230,15 +334,20 @@ export async function listDocumentsOverview(drive: DriveView | null): Promise<Do
 }
 
 export interface ProjectOverview {
-  project: { id: string; name: string; slug: string };
+  project: { id: string; name: string; slug: string; role: ProjectMemberRole };
   documents: { id: string; title: string; storage: 'db' | 'git' }[];
+  /** Whether the current user's project role permits creating/editing documents here. */
+  canEdit: boolean;
 }
 
 /**
  * Reads one project and the documents filed under it, for the project
  * detail route (`/docs/projects/[projectId]`, D-09). Returns `null` if the
- * project doesn't exist, isn't in this tenant, or isn't owned by the
- * current user — the route 404s on that, same as `getDocumentForEdit`.
+ * project doesn't exist, isn't in this tenant, or the current user has no
+ * `docs_project_members` role on it — the route 404s on that, same as
+ * `getDocumentForEdit`. Documents are **not** filtered by `ownerId` here — a
+ * shared editor/viewer needs to see every document filed under the project,
+ * not just ones they personally created.
  */
 export async function getProjectOverview(projectId: string): Promise<ProjectOverview | null> {
   const { db, userId, tenantId } = await getContext();
@@ -246,27 +355,18 @@ export async function getProjectOverview(projectId: string): Promise<ProjectOver
   const [project] = await db
     .select({ id: docsProjects.id, name: docsProjects.name, slug: docsProjects.slug })
     .from(docsProjects)
-    .where(
-      and(
-        eq(docsProjects.id, projectId),
-        eq(docsProjects.tenantId, tenantId),
-        eq(docsProjects.ownerId, userId),
-      ),
-    );
+    .where(and(eq(docsProjects.id, projectId), eq(docsProjects.tenantId, tenantId)));
   if (!project) return null;
+
+  const role = await resolveProjectRole(db, tenantId, userId, projectId);
+  if (!role) return null;
 
   const documents = await db
     .select({ id: docsDocuments.id, title: docsDocuments.title, storage: docsDocuments.storage })
     .from(docsDocuments)
-    .where(
-      and(
-        eq(docsDocuments.tenantId, tenantId),
-        eq(docsDocuments.ownerId, userId),
-        eq(docsDocuments.projectId, projectId),
-      ),
-    );
+    .where(and(eq(docsDocuments.tenantId, tenantId), eq(docsDocuments.projectId, projectId)));
 
-  return { project, documents };
+  return { project: { ...project, role }, documents, canEdit: canEditProjectRole(role) };
 }
 
 export interface DocumentEditorData {
@@ -283,11 +383,13 @@ export interface DocumentEditorData {
 }
 
 /**
- * Loads a document for the editor route, scoped by `docs_document_members`
+ * Loads a document for the editor route, scoped by `resolveDocumentRole`
  * rather than `ownerId` directly — a shared document's viewers/editors
- * (D-13) go through the same membership row an owner's own auto-inserted
- * row does. Returns `null` if the document doesn't exist, isn't in this
- * tenant, or the current user has no membership row on it (→ 404).
+ * (D-13), or a member of the project it's filed under (the "shared folder"
+ * fallback), go through the same resolution an owner's own auto-inserted
+ * `docs_document_members` row does. Returns `null` if the document doesn't
+ * exist, isn't in this tenant, or the current user has no resolvable role
+ * on it (→ 404).
  */
 export async function getDocumentForEdit(documentId: string): Promise<DocumentEditorData | null> {
   const { db, userId, tenantId } = await getContext();
@@ -300,24 +402,17 @@ export async function getDocumentForEdit(documentId: string): Promise<DocumentEd
       content: docsDocuments.content,
       storage: docsDocuments.storage,
       syncStatus: docsDocuments.syncStatus,
+      projectId: docsDocuments.projectId,
     })
     .from(docsDocuments)
     .where(and(eq(docsDocuments.id, documentId), eq(docsDocuments.tenantId, tenantId)));
   if (!doc) return null;
 
-  const [membership] = await db
-    .select({ role: docsDocumentMembers.role })
-    .from(docsDocumentMembers)
-    .where(
-      and(
-        eq(docsDocumentMembers.documentId, documentId),
-        eq(docsDocumentMembers.tenantId, tenantId),
-        eq(docsDocumentMembers.userId, userId),
-      ),
-    );
-  if (!membership) return null;
+  const role = await resolveDocumentRole(db, tenantId, userId, documentId, doc.projectId);
+  if (!role) return null;
 
-  return { ...doc, role: membership.role, canEdit: canEditRole(membership.role) };
+  const { projectId: _projectId, ...docFields } = doc;
+  return { ...docFields, role, canEdit: canEditRole(role) };
 }
 
 /**
@@ -329,25 +424,16 @@ export async function getDocumentForEdit(documentId: string): Promise<DocumentEd
 export async function saveDocument(documentId: string, formData: FormData): Promise<ActionResult> {
   const { db, userId, tenantId } = await getContext();
 
-  const [membership] = await db
-    .select({ role: docsDocumentMembers.role })
-    .from(docsDocumentMembers)
-    .where(
-      and(
-        eq(docsDocumentMembers.documentId, documentId),
-        eq(docsDocumentMembers.tenantId, tenantId),
-        eq(docsDocumentMembers.userId, userId),
-      ),
-    );
-  if (!membership || !canEditRole(membership.role)) {
-    return { ok: false, error: "You don't have permission to edit this document." };
-  }
-
   const [existing] = await db
-    .select({ storage: docsDocuments.storage })
+    .select({ storage: docsDocuments.storage, projectId: docsDocuments.projectId })
     .from(docsDocuments)
     .where(and(eq(docsDocuments.id, documentId), eq(docsDocuments.tenantId, tenantId)));
   if (!existing) return { ok: false, error: 'Document not found.' };
+
+  const role = await resolveDocumentRole(db, tenantId, userId, documentId, existing.projectId);
+  if (!role || !canEditRole(role)) {
+    return { ok: false, error: "You don't have permission to edit this document." };
+  }
 
   const title = String(formData.get('title') ?? '').trim() || DEFAULT_DOCUMENT_TITLE;
   const content = String(formData.get('content') ?? '');

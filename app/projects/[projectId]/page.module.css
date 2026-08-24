@@ -14,12 +14,3 @@
 .backLink:hover {
   color: var(--sv-color-text-primary);
 }
-
-.grid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: var(--sv-space-3);
-}

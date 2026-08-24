@@ -70,3 +70,19 @@ export const docsDocumentMembers = pgTable(
     uniqueIndex('docs_document_members_document_user_idx').on(t.documentId, t.userId),
   ],
 );
+
+export const docsProjectMembers = pgTable(
+  'docs_project_members',
+  {
+    projectId: text('project_id').notNull(),
+    userId: text('user_id').notNull(),
+    tenantId: text('tenant_id').notNull(),
+    role: text('role').notNull(),
+    invitedBy: text('invited_by'),
+    joinedAt: integer('joined_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.projectId, t.userId] }),
+    uniqueIndex('docs_project_members_project_user_idx').on(t.projectId, t.userId),
+  ],
+);

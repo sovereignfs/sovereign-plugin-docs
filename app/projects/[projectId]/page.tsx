@@ -2,9 +2,16 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { EmptyState, PageHeader } from '@sovereignfs/ui';
 import { CreateDocumentDialog } from '../../_components/CreateDocumentDialog';
-import { Tile } from '../../_components/Tile';
+import { ProjectDocumentsGrid } from '../../_components/ProjectDocumentsGrid';
+import { ProjectShareButton } from '../../_components/ProjectShareButton';
 import { getDrive } from '../../_lib/actions';
 import { getProjectOverview } from '../../_lib/documents';
+import {
+  inviteProjectMember,
+  listProjectMembers,
+  removeProjectMember,
+  searchProjectDirectoryUsers,
+} from '../../_lib/project-sharing';
 import styles from './page.module.css';
 
 interface ProjectPageProps {
@@ -18,7 +25,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
   const drive = await getDrive();
   const driveConnected = drive?.status === 'connected';
-  const { project, documents } = overview;
+  const { project, documents, canEdit } = overview;
 
   return (
     <div className={styles.page}>
@@ -29,38 +36,42 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
       <PageHeader
         title={project.name}
         action={
-          <CreateDocumentDialog
-            projects={[]}
-            driveConnected={driveConnected}
-            fixedProjectId={project.id}
-          />
+          project.role === 'owner' ? (
+            <ProjectShareButton
+              listMembersAction={listProjectMembers.bind(null, project.id)}
+              searchUsersAction={searchProjectDirectoryUsers.bind(null, project.id)}
+              inviteAction={inviteProjectMember.bind(null, project.id)}
+              removeAction={removeProjectMember.bind(null, project.id)}
+            />
+          ) : undefined
         }
       />
 
       {documents.length === 0 ? (
         <EmptyState
           heading="No documents in this project yet"
-          description="Create the first one to get started."
+          description={
+            canEdit
+              ? 'Create the first one to get started.'
+              : 'The project owner hasn’t added any documents yet.'
+          }
           action={
-            <CreateDocumentDialog
-              projects={[]}
-              driveConnected={driveConnected}
-              fixedProjectId={project.id}
-            />
+            canEdit ? (
+              <CreateDocumentDialog
+                projects={[]}
+                driveConnected={driveConnected}
+                fixedProjectId={project.id}
+              />
+            ) : undefined
           }
         />
       ) : (
-        <ul className={styles.grid}>
-          {documents.map((doc) => (
-            <li key={doc.id}>
-              <Tile
-                href={`/docs/${doc.id}`}
-                label={doc.title}
-                badge={doc.storage === 'git' ? 'Git' : undefined}
-              />
-            </li>
-          ))}
-        </ul>
+        <ProjectDocumentsGrid
+          documents={documents}
+          fixedProjectId={project.id}
+          driveConnected={driveConnected}
+          canEdit={canEdit}
+        />
       )}
     </div>
   );

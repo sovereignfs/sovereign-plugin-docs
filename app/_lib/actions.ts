@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { sdk } from '@sovereignfs/sdk';
+import type { NotificationListResult } from '@sovereignfs/sdk';
 import { and, eq } from 'drizzle-orm';
 import { docsDrives } from '../_db/schema';
 import type { ActionResult } from './context';
@@ -202,4 +203,41 @@ export async function disconnectDrive(
 
   revalidatePath('/');
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Platform notifications — thin wrappers over `@sovereignfs/sdk`'s
+// `notifications` namespace, consumed by `DocsNotificationBell` (the
+// self-rendered header's bell under `shell: minimal`, mirroring Kanban's own
+// `KanbanNotificationBell`/`listPlatformNotifications` et al.). The session
+// check is what makes these safe to expose as server actions — not the
+// (nonexistent) route-level gating an action id gets none of.
+
+export async function listPlatformNotifications(): Promise<NotificationListResult> {
+  await sdk.auth.requireSession();
+  return sdk.notifications.list();
+}
+
+export async function markPlatformNotificationRead(id: string): Promise<ActionResult> {
+  await sdk.auth.requireSession();
+  await sdk.notifications.markRead(id);
+  return { ok: true, message: 'Marked read.' };
+}
+
+export async function markAllPlatformNotificationsRead(): Promise<ActionResult> {
+  await sdk.auth.requireSession();
+  await sdk.notifications.markAllRead();
+  return { ok: true, message: 'Marked all read.' };
+}
+
+export async function dismissPlatformNotification(id: string): Promise<ActionResult> {
+  await sdk.auth.requireSession();
+  await sdk.notifications.dismiss(id);
+  return { ok: true, message: 'Dismissed.' };
+}
+
+export async function dismissAllPlatformNotifications(): Promise<ActionResult> {
+  await sdk.auth.requireSession();
+  await sdk.notifications.dismissAll();
+  return { ok: true, message: 'Cleared.' };
 }

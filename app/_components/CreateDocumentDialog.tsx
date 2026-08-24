@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useState, type ReactNode } from 'react';
 import { Button, Dialog, FormField, Input, Select } from '@sovereignfs/ui';
 import type { ActionResult } from '../_lib/context';
 import { createDocument } from '../_lib/documents';
@@ -11,12 +11,15 @@ interface CreateDocumentDialogProps {
   driveConnected: boolean;
   /** When set, the document is created directly in this project — no picker shown (project page context). */
   fixedProjectId?: string;
+  /** Custom trigger instead of the default "New document" button — e.g. a dashed NewCardTile in a grid. */
+  renderTrigger?: (props: { onClick: () => void }) => ReactNode;
 }
 
 export function CreateDocumentDialog({
   projects,
   driveConnected,
   fixedProjectId,
+  renderTrigger,
 }: CreateDocumentDialogProps) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
@@ -37,9 +40,13 @@ export function CreateDocumentDialog({
 
   return (
     <>
-      <Button type="button" onClick={() => setOpen(true)}>
-        New document
-      </Button>
+      {renderTrigger ? (
+        renderTrigger({ onClick: () => setOpen(true) })
+      ) : (
+        <Button type="button" onClick={() => setOpen(true)}>
+          New document
+        </Button>
+      )}
       <Dialog open={open} onClose={() => setOpen(false)} size="sm" title="New document">
         <form action={formAction} className={styles.form}>
           {state && !state.ok && (
