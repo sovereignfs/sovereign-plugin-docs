@@ -3,28 +3,28 @@
 import Link from 'next/link';
 import { CardTile, CardTileGrid, Icon, NewCardTile } from '@sovereignfs/ui';
 import { CreateDocumentDialog } from './CreateDocumentDialog';
-import styles from './ProjectDocumentsGrid.module.css';
+import styles from './FolderDocumentsGrid.module.css';
 
-interface ProjectDocumentsGridProps {
+interface FolderDocumentsGridProps {
   documents: { id: string; title: string; storage: 'db' | 'git' }[];
-  fixedProjectId: string;
+  folderId: string;
   driveConnected: boolean;
   canEdit: boolean;
 }
 
 /**
- * The project detail page's document grid, split into its own client
+ * The folder detail page's document grid, split into its own client
  * component so `CreateDocumentDialog`'s `renderTrigger` closure is created
  * and consumed entirely client-side — passing a plain function as a prop
  * from the page's Server Component straight to a Client Component isn't
  * allowed ("Functions cannot be passed directly to Client Components").
  */
-export function ProjectDocumentsGrid({
+export function FolderDocumentsGrid({
   documents,
-  fixedProjectId,
+  folderId,
   driveConnected,
   canEdit,
-}: ProjectDocumentsGridProps) {
+}: FolderDocumentsGridProps) {
   return (
     <CardTileGrid>
       {documents.map((doc) => (
@@ -37,9 +37,8 @@ export function ProjectDocumentsGrid({
       ))}
       {canEdit && (
         <CreateDocumentDialog
-          projects={[]}
+          folderId={folderId}
           driveConnected={driveConnected}
-          fixedProjectId={fixedProjectId}
           renderTrigger={({ onClick }) => <NewCardTile label="New document" onClick={onClick} />}
         />
       )}

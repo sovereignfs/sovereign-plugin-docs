@@ -149,7 +149,7 @@ git repository.
 
 **Why document bodies live in the DB, not `sdk.storage`.** `sdk.storage` (RFC 0044)
 does write real files to disk, but under **server-generated opaque object IDs**, not
-a human-navigable `docs/<project>/<slug>.md` tree — so it would not deliver the
+a human-navigable `docs/<folder>/<slug>.md` tree — so it would not deliver the
 "browse your Markdown" experience that only git provides, while costing more:
 Google-Docs-style **autosave** produces many small writes (DB rows handle this far
 better than rewriting storage objects and re-accounting storage quota each time),
@@ -208,13 +208,13 @@ scope for v1.
 | ID      | Requirement                                                                                                                                                                     |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | DOCS-01 | On first use the user lands directly in a **document workspace** — no setup required. They can create and edit documents immediately, with content stored locally on the platform. |
-| DOCS-02 | The user can create **document projects** (folders) and **individual documents**. _Create project_ prompts for a name; _create document_ opens the editor on a blank document.   |
+| DOCS-02 | The user can create **folders** and **individual documents** — every document is filed under a folder. _Create folder_ prompts for a name; _create document_ (from inside a folder) opens the editor on a blank document.   |
 | DOCS-03 | Documents **autosave** continuously to the platform DB (no explicit Save). An autosave indicator communicates state ("Saving…", "All changes saved").                            |
 | DOCS-04 | The **editor** is **Markdown-canonical** with a **WYSIWYG view** over the same Markdown. Each user sets their **default view** (Markdown / WYSIWYG) as a stored preference.       |
 | DOCS-05 | A user may create up to **`FREE_DOC_LIMIT`** local documents (operator-set, default 25). At the limit, creating more requires connecting a **Sovereign Drive** (git repo).       |
 | DOCS-06 | Connecting a drive is an **opt-in, secondary** action from settings (or prompted at the quota limit). Documents created with a drive connected may be **git-backed**.           |
 | DOCS-07 | For a **git-backed** document, **Sync to Git** pushes its Markdown to the configured repository; **revisions** come from git commit history (commits filtered to the file path). |
-| DOCS-08 | The **document list** (home) shows all projects and documents owned by (or shared with) the user, with search, in a clean Google-Docs/Drive-style layout, plus a quota indicator. |
+| DOCS-08 | The **document list** (home) shows all folders and documents owned by (or shared with) the user, with search, in a clean Google-Docs/Drive-style layout, plus a quota indicator. |
 | DOCS-09 | Opening a document opens a **viewer** (read-only render) with a toggle to **edit mode** (permission-gated).                                                                      |
 | DOCS-10 | The user can **share** a document with other instance users (roles owner/editor/viewer).                                                                                         |
 | DOCS-11 | A document can be **exported/downloaded as a plain `.md` file** at any time, regardless of tier.                                                                                  |
@@ -227,10 +227,10 @@ tokens and components (no Tailwind, no runtime CSS-in-JS), following the
 `sv-ui-design` workflow (wireframe-first). "App" is the user-facing term; "plugin"
 never appears in end-user copy.
 
-- **Home / document list (Drive-style).** A grid or list of documents and projects
-  owned by / shared with the user; a prominent **"＋ Blank"** create action; project
-  (folder) navigation; **search**; the quota indicator. Empty state invites creating
-  the first document.
+- **Home / document list (Drive-style).** A grid or list of folders and documents
+  owned by / shared with the user; a prominent **"＋ Blank"** create action; folder
+  navigation; **search**; the quota indicator. Empty state invites creating
+  the first folder.
 - **Editor (Docs-style).** Full-bleed document page on a neutral canvas; a top bar
   with the **inline-editable title** and a menu; a **formatting toolbar**; an
   **autosave indicator**; a **Markdown ⇄ WYSIWYG view toggle**; a **Share** button;
@@ -311,11 +311,12 @@ draft→publish model and implies per-user collaboration that is post-v1), and a
 
 | Table                   | Key columns                                                                                                                                                                       |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs_documents`        | `id`, `tenant_id`, `owner_id`, `project_id?`, `title`, `slug`, **`content`** (canonical Markdown), **`storage`** (`db`\|`git`), `git_path?`, `base_sha?`, `sync_status?` (`synced`\|`pending`\|`conflict`), `last_synced_at?`, `created_at`, `updated_at` |
-| `docs_projects`         | `id`, `tenant_id`, `owner_id`, `name`, `slug`, `created_at`                                                                                                                        |
+| `docs_documents`        | `id`, `tenant_id`, `owner_id`, `folder_id`, `title`, `slug`, **`content`** (canonical Markdown), **`storage`** (`db`\|`git`), `git_path?`, `base_sha?`, `sync_status?` (`synced`\|`pending`\|`conflict`), `last_synced_at?`, `created_at`, `updated_at` — every document belongs to a folder, there is no root level |
+| `docs_folders`          | `id`, `tenant_id`, `owner_id`, `name`, `slug`, `created_at`                                                                                                                        |
 | `docs_user_prefs`       | `user_id` (PK), `tenant_id`, `default_view` (`markdown`\|`wysiwyg`), `created_at`, `updated_at`                                                                                    |
 | `docs_drives`           | `user_id` (PK, one repo/user), `tenant_id`, `connection_id` (→ `sdk.connections`), `branch`, `base_path` (`docs`), `created_at` — **optional now; only exists for git-backed docs** |
 | `docs_document_members` | (`document_id`, `user_id`) PK, `tenant_id`, `role` (`owner`\|`editor`\|`viewer`), `invited_by?`, `joined_at`                                                                       |
+| `docs_folder_members`   | (`folder_id`, `user_id`) PK, `tenant_id`, `role` (`owner`\|`editor`\|`viewer`), `invited_by?`, `joined_at` — a folder role also grants access to every document filed under it (D-13-style "shared folder" model) |
 | `docs_public_shares`    | `id`, `tenant_id`, `document_id`, `token` (unique), `mode` (`expiring`\|`permanent`), `expires_at?`, `created_by`, `created_at` — v0.2 (D-17)                                       |
 
 **Removed:** `docs_drafts` (content moved into `docs_documents.content`; autosave
@@ -346,17 +347,19 @@ Candidate read-only contracts: `docs.documents` (v1), `docs.snippets` (v1),
 ## Portability and deletion
 
 Export includes document metadata **and content** (Markdown, since bodies are now
-canonical in the DB), projects, user view preferences, shares, public-share
+canonical in the DB), folders, user view preferences, shares, public-share
 records, and connection metadata. Git credentials are never exported. Import
 restores documents/metadata additively; remote git contents are not recreated
 unless the user reconnects a drive. User deletion removes the user's documents and
 prefs, disconnects the `sdk.connections` record (removing the linked `sdk.secrets`
 entry), revokes public shares created by the user, and transfers/archives shared
-documents per membership.
+folders and documents per membership — a folder with no successor member is
+hard-deleted along with every document still filed under it (documents cannot
+exist without a folder).
 
 ## Build plan
 
-- **v0.1 (local-first core)** — schema restructure; the quota; create project/
+- **v0.1 (local-first core)** — schema restructure; the quota; create folder/
   document with quota gating; the Markdown editor + autosave; the Drive-style
   document list with search; per-user view preference + WYSIWYG view; viewer +
   edit toggle; the **opt-in git-backed tier** (Sync to Git + git revisions,

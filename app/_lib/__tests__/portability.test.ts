@@ -76,30 +76,30 @@ vi.mock('@sovereignfs/sdk', () => ({
 
 interface Store extends Record<string, Row[]> {
   docs_drives: Row[];
-  docs_projects: Row[];
+  docs_folders: Row[];
   docs_documents: Row[];
   docs_user_prefs: Row[];
   docs_document_members: Row[];
-  docs_project_members: Row[];
+  docs_folder_members: Row[];
 }
 
 let store: Store = {
   docs_drives: [],
-  docs_projects: [],
+  docs_folders: [],
   docs_documents: [],
   docs_user_prefs: [],
   docs_document_members: [],
-  docs_project_members: [],
+  docs_folder_members: [],
 };
 
 function resetStore() {
   store = {
     docs_drives: [],
-    docs_projects: [],
+    docs_folders: [],
     docs_documents: [],
     docs_user_prefs: [],
     docs_document_members: [],
-    docs_project_members: [],
+    docs_folder_members: [],
   };
 }
 
@@ -158,7 +158,7 @@ beforeEach(() => {
 });
 
 describe('portability export', () => {
-  it("exports only the user's own projects and documents (content inline), the user's view preference, and every member of a document they own, with a warning about the drive", async () => {
+  it("exports only the user's own folders and documents (content inline), the user's view preference, and every member of a document they own, with a warning about the drive", async () => {
     const { registerPortabilityHandlers } = await import('../portability');
     await registerPortabilityHandlers();
 
@@ -166,13 +166,13 @@ describe('portability export', () => {
       { userId: 'u1', tenantId: 't1', connectionId: 'conn-1', branch: 'main', basePath: 'docs', createdAt: 1 },
     ];
     store.docs_user_prefs = [{ userId: 'u1', tenantId: 't1', defaultView: 'wysiwyg', createdAt: 1, updatedAt: 1 }];
-    store.docs_projects = [
-      { id: 'proj-1', tenantId: 't1', ownerId: 'u1', name: 'Handbook', slug: 'handbook', createdAt: 1 },
-      { id: 'proj-2', tenantId: 't1', ownerId: 'other', name: 'Not mine', slug: 'not-mine', createdAt: 1 },
+    store.docs_folders = [
+      { id: 'folder-1', tenantId: 't1', ownerId: 'u1', name: 'Handbook', slug: 'handbook', createdAt: 1 },
+      { id: 'folder-2', tenantId: 't1', ownerId: 'other', name: 'Not mine', slug: 'not-mine', createdAt: 1 },
     ];
     store.docs_documents = [
-      { id: 'doc-1', tenantId: 't1', ownerId: 'u1', projectId: 'proj-1', title: 'Onboarding', slug: 'onboarding', content: 'Hello', storage: 'db', gitPath: null, baseSha: null, syncStatus: null, lastSyncedAt: null, createdAt: 1, updatedAt: 1 },
-      { id: 'doc-2', tenantId: 't1', ownerId: 'other', projectId: 'proj-2', title: 'Not mine', slug: 'not-mine', content: 'nope', storage: 'db', gitPath: null, baseSha: null, syncStatus: null, lastSyncedAt: null, createdAt: 1, updatedAt: 1 },
+      { id: 'doc-1', tenantId: 't1', ownerId: 'u1', folderId: 'folder-1', title: 'Onboarding', slug: 'onboarding', content: 'Hello', storage: 'db', gitPath: null, baseSha: null, syncStatus: null, lastSyncedAt: null, createdAt: 1, updatedAt: 1 },
+      { id: 'doc-2', tenantId: 't1', ownerId: 'other', folderId: 'folder-2', title: 'Not mine', slug: 'not-mine', content: 'nope', storage: 'db', gitPath: null, baseSha: null, syncStatus: null, lastSyncedAt: null, createdAt: 1, updatedAt: 1 },
     ];
     store.docs_document_members = [
       { documentId: 'doc-1', userId: 'u1', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
@@ -186,18 +186,18 @@ describe('portability export', () => {
       options: { includeFiles: true },
     });
     expect(section).toBeDefined();
-    expect((section as PluginExportSection).schemaVersion).toBe(3);
+    expect((section as PluginExportSection).schemaVersion).toBe(4);
 
     const data = (section as PluginExportSection).data as {
       drive: { branch: string } | null;
       defaultView: string | null;
-      projects: { id: string }[];
+      folders: { id: string }[];
       documents: { id: string; content: string; storage: string }[];
       documentMembers: { documentId: string; userId: string; role: string }[];
     };
     expect(data.drive?.branch).toBe('main');
     expect(data.defaultView).toBe('wysiwyg');
-    expect(data.projects.map((p) => p.id)).toEqual(['proj-1']);
+    expect(data.folders.map((f) => f.id)).toEqual(['folder-1']);
     expect(data.documents.map((d) => d.id)).toEqual(['doc-1']);
     expect(data.documents[0]).toMatchObject({ content: 'Hello', storage: 'db' });
     // Every member of the owned document doc-1 is included, not just the exporting user's own row.
@@ -209,19 +209,19 @@ describe('portability export', () => {
 });
 
 describe('portability import', () => {
-  it('remaps a document to its project, scopes it to the importing user as a local doc with an owner membership row, without re-creating the drive or preference other users hold', async () => {
+  it('remaps a document to its folder, scopes it to the importing user as a local doc with an owner membership row, without re-creating the drive or preference other users hold', async () => {
     const { registerPortabilityHandlers } = await import('../portability');
     await registerPortabilityHandlers();
 
     const section: PluginExportSection = {
       pluginId: 'fs.sovereign.docs',
-      schemaVersion: 3,
+      schemaVersion: 4,
       data: {
         drive: { branch: 'main', basePath: 'docs', createdAt: 1 },
         defaultView: 'markdown',
-        projects: [{ id: 'src-proj-1', name: 'Handbook', slug: 'handbook', createdAt: 1 }],
+        folders: [{ id: 'src-folder-1', name: 'Handbook', slug: 'handbook', createdAt: 1 }],
         documents: [
-          { id: 'src-doc-1', projectId: 'src-proj-1', title: 'Onboarding', slug: 'onboarding', content: 'Hello', storage: 'git', gitPath: 'docs/handbook/onboarding.md', syncStatus: 'synced', lastSyncedAt: 1, createdAt: 1, updatedAt: 1 },
+          { id: 'src-doc-1', folderId: 'src-folder-1', title: 'Onboarding', slug: 'onboarding', content: 'Hello', storage: 'git', gitPath: 'docs/handbook/onboarding.md', syncStatus: 'synced', lastSyncedAt: 1, createdAt: 1, updatedAt: 1 },
         ],
         documentMembers: [{ documentId: 'src-doc-1', userId: 'u1', role: 'owner', invitedBy: null, joinedAt: 1 }],
       },
@@ -229,20 +229,20 @@ describe('portability import', () => {
 
     await capturedImporter.fn?.(section, { userId: 'u2', tenantId: 't1', remapId: (id) => `new-${id}` });
 
-    expect(store.docs_projects).toEqual([
-      expect.objectContaining({ id: 'new-src-proj-1', ownerId: 'u2', tenantId: 't1' }),
+    expect(store.docs_folders).toEqual([
+      expect.objectContaining({ id: 'new-src-folder-1', ownerId: 'u2', tenantId: 't1' }),
     ]);
-    // An owner membership row is created — without it the project would be
-    // unreachable (getProjectOverview/listDocumentsOverview both read
-    // through docs_project_members, not ownerId directly).
-    expect(store.docs_project_members).toEqual([
-      expect.objectContaining({ projectId: 'new-src-proj-1', userId: 'u2', role: 'owner' }),
+    // An owner membership row is created — without it the folder would be
+    // unreachable (getFolderOverview/listDocumentsOverview both read
+    // through docs_folder_members, not ownerId directly).
+    expect(store.docs_folder_members).toEqual([
+      expect.objectContaining({ folderId: 'new-src-folder-1', userId: 'u2', role: 'owner' }),
     ]);
     // A git-backed document is imported as local (its remote mirror is not re-created), content preserved.
     expect(store.docs_documents).toEqual([
       expect.objectContaining({
         id: 'new-src-doc-1',
-        projectId: 'new-src-proj-1',
+        folderId: 'new-src-folder-1',
         ownerId: 'u2',
         content: 'Hello',
         storage: 'db',
@@ -261,14 +261,38 @@ describe('portability import', () => {
     ]);
   });
 
+  it("skips a document whose folder isn't among the exporting user's own folders (they only had editor access to it, not ownership) rather than fabricating one", async () => {
+    const { registerPortabilityHandlers } = await import('../portability');
+    await registerPortabilityHandlers();
+
+    const section: PluginExportSection = {
+      pluginId: 'fs.sovereign.docs',
+      schemaVersion: 4,
+      data: {
+        drive: null,
+        defaultView: null,
+        folders: [],
+        documents: [
+          { id: 'src-doc-1', folderId: 'someone-elses-folder', title: 'Orphan', slug: 'orphan', content: 'x', storage: 'db', gitPath: null, syncStatus: null, lastSyncedAt: null, createdAt: 1, updatedAt: 1 },
+        ],
+        documentMembers: [],
+      },
+    };
+
+    await capturedImporter.fn?.(section, { userId: 'u2', tenantId: 't1', remapId: (id) => `new-${id}` });
+
+    expect(store.docs_documents).toEqual([]);
+    expect(store.docs_document_members).toEqual([]);
+  });
+
   it('rejects an export section with a stale schema version', async () => {
     const { registerPortabilityHandlers } = await import('../portability');
     await registerPortabilityHandlers();
 
     const section: PluginExportSection = {
       pluginId: 'fs.sovereign.docs',
-      schemaVersion: 2,
-      data: { drive: null, defaultView: null, projects: [], documents: [], documentMembers: [] },
+      schemaVersion: 3,
+      data: { drive: null, defaultView: null, folders: [], documents: [], documentMembers: [] },
     };
 
     await expect(
@@ -278,53 +302,72 @@ describe('portability import', () => {
 });
 
 describe('portability delete', () => {
-  it("transfers ownership of a document with other members instead of deleting it, removes the user's own share of a document they don't own, disconnects the drive connection, and cleans up projects and preferences", async () => {
+  it("transfers ownership of a document with other members instead of deleting it, removes the user's own share of a document they don't own, cascade-deletes a document filed under a folder that has no successor (even one already transferred at the document level), transfers a folder with a successor member, disconnects the drive connection, and cleans up preferences", async () => {
     const { registerPortabilityHandlers } = await import('../portability');
     await registerPortabilityHandlers();
 
     store.docs_drives = [{ userId: 'u1', tenantId: 't1', connectionId: 'conn-1', branch: 'main', basePath: 'docs', createdAt: 1 }];
-    store.docs_projects = [{ id: 'proj-1', tenantId: 't1', ownerId: 'u1', name: 'Mine', slug: 'mine', createdAt: 1 }];
+    store.docs_folders = [
+      { id: 'folder-1', tenantId: 't1', ownerId: 'u1', name: 'Mine, shared', slug: 'mine-shared', createdAt: 1 },
+      { id: 'folder-2', tenantId: 't1', ownerId: 'u1', name: 'Mine, sole', slug: 'mine-sole', createdAt: 1 },
+      { id: 'folder-3', tenantId: 't1', ownerId: 'other', name: 'Not mine', slug: 'not-mine', createdAt: 1 },
+    ];
     store.docs_documents = [
-      { id: 'doc-1', tenantId: 't1', ownerId: 'u1', projectId: 'proj-1', title: 'Mine, shared', slug: 'mine', content: 'a', storage: 'db', createdAt: 1, updatedAt: 1 },
-      { id: 'doc-2', tenantId: 't1', ownerId: 'u1', projectId: null, title: 'Mine, sole', slug: 'sole', content: 'c', storage: 'db', createdAt: 1, updatedAt: 1 },
-      { id: 'doc-3', tenantId: 't1', ownerId: 'other', projectId: null, title: 'Not mine', slug: 'not-mine', content: 'b', storage: 'db', createdAt: 1, updatedAt: 1 },
+      { id: 'doc-1', tenantId: 't1', ownerId: 'u1', folderId: 'folder-1', title: 'In a surviving folder', slug: 'doc-1', content: 'a', storage: 'db', createdAt: 1, updatedAt: 1 },
+      { id: 'doc-2', tenantId: 't1', ownerId: 'u1', folderId: 'folder-2', title: 'In a hard-deleted folder', slug: 'doc-2', content: 'b', storage: 'db', createdAt: 1, updatedAt: 1 },
+      { id: 'doc-3', tenantId: 't1', ownerId: 'other', folderId: 'folder-3', title: 'Not mine', slug: 'doc-3', content: 'c', storage: 'db', createdAt: 1, updatedAt: 1 },
     ];
     store.docs_user_prefs = [
       { userId: 'u1', tenantId: 't1', defaultView: 'wysiwyg', createdAt: 1, updatedAt: 1 },
       { userId: 'other', tenantId: 't1', defaultView: 'markdown', createdAt: 1, updatedAt: 1 },
     ];
     store.docs_document_members = [
+      // doc-1: u1 owner, 'other' viewer -> transfers to 'other' at the document level.
       { documentId: 'doc-1', userId: 'u1', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
       { documentId: 'doc-1', userId: 'other', tenantId: 't1', role: 'viewer', invitedBy: 'u1', joinedAt: 2 },
+      // doc-2: same shape as doc-1 (u1 owner, 'other' viewer) -> also transfers at the
+      // document level, but folder-2 (its folder) has no successor and gets
+      // hard-deleted, cascading doc-2 away regardless of the document-level transfer.
       { documentId: 'doc-2', userId: 'u1', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
+      { documentId: 'doc-2', userId: 'other', tenantId: 't1', role: 'viewer', invitedBy: 'u1', joinedAt: 2 },
+      // doc-3: u1 only has a share on someone else's document.
       { documentId: 'doc-3', userId: 'u1', tenantId: 't1', role: 'viewer', invitedBy: 'other', joinedAt: 1 },
       { documentId: 'doc-3', userId: 'other', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
     ];
-    // u1 is proj-1's sole project member (no successor) — deleting u1 hard-
-    // deletes the project, same as before docs_project_members existed.
-    store.docs_project_members = [
-      { projectId: 'proj-1', userId: 'u1', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
+    store.docs_folder_members = [
+      // folder-1: u1 owner, 'other' viewer -> transfers to 'other' (survives).
+      { folderId: 'folder-1', userId: 'u1', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
+      { folderId: 'folder-1', userId: 'other', tenantId: 't1', role: 'viewer', invitedBy: 'u1', joinedAt: 2 },
+      // folder-2: u1 is the sole member -> no successor, hard-deleted.
+      { folderId: 'folder-2', userId: 'u1', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
+      // folder-3: u1 has no role here at all (not shared the folder itself, just doc-3 individually).
+      { folderId: 'folder-3', userId: 'other', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
     ];
 
     const result = await capturedDeleter.fn?.({ userId: 'u1', tenantId: 't1', db: fakeDb });
     expect(result).toBeDefined();
 
-    expect(store.docs_projects).toEqual([]);
-    expect(store.docs_project_members).toEqual([]);
-    // doc-1 survives, transferred to its remaining member ('other') instead of being deleted.
-    // doc-2 (sole owner, no other members) is hard-deleted. doc-3 (not owned by u1) is untouched.
+    // folder-1 survives (transferred to 'other'); folder-2 is hard-deleted (no successor); folder-3 untouched.
+    expect(store.docs_folders.map((f) => f.id).sort()).toEqual(['folder-1', 'folder-3']);
+    expect(store.docs_folders.find((f) => f.id === 'folder-1')).toMatchObject({ ownerId: 'other' });
+    expect(store.docs_folder_members).toEqual([
+      expect.objectContaining({ folderId: 'folder-1', userId: 'other', role: 'owner' }),
+      expect.objectContaining({ folderId: 'folder-3', userId: 'other', role: 'owner' }),
+    ]);
+
+    // doc-1 survives (its folder survived); doc-2 is cascade-deleted with
+    // folder-2 despite having its own document-level successor; doc-3
+    // (not owned by u1) is untouched.
     expect(store.docs_documents.map((d) => d.id).sort()).toEqual(['doc-1', 'doc-3']);
-    // doc-1's new owner ('other') has no docs_project_members role on proj-1,
-    // and proj-1 has no successor and is hard-deleted — doc-1 is reparented
-    // to root level rather than left pointing at a deleted project.
     expect(store.docs_documents.find((d) => d.id === 'doc-1')).toMatchObject({
       ownerId: 'other',
-      projectId: null,
+      folderId: 'folder-1',
     });
     expect(store.docs_document_members).toEqual([
       expect.objectContaining({ documentId: 'doc-1', userId: 'other', role: 'owner' }),
       expect.objectContaining({ documentId: 'doc-3', userId: 'other', role: 'owner' }),
     ]);
+
     expect(store.docs_drives).toEqual([]);
     expect(disconnectMock).toHaveBeenCalledWith('conn-1');
     // The user's own preference row is removed; another user's is left intact.

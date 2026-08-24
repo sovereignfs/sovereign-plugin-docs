@@ -24,11 +24,13 @@ export function uniqueSlug(base: string, existing: ReadonlySet<string>): string 
   return `${base}-${suffix}`;
 }
 
-/** Builds a git-backed document's path within the repo (SPEC.md "Directory structure"). */
-export function buildGitPath(basePath: string, projectSlug: string | null, slug: string): string {
-  return [basePath, projectSlug, `${slug}.md`].filter((segment): segment is string =>
-    Boolean(segment),
-  ).join('/');
+/**
+ * Builds a git-backed document's path within the repo (SPEC.md "Directory
+ * structure") — every document is filed under a folder, so `folderSlug` is
+ * always present.
+ */
+export function buildGitPath(basePath: string, folderSlug: string, slug: string): string {
+  return [basePath, folderSlug, `${slug}.md`].join('/');
 }
 
 export type DocumentStorage = 'db' | 'git';

@@ -34,7 +34,7 @@ export const docsDrives = sqliteTable('docs_drives', {
   createdAt: integer('created_at').notNull(),
 });
 
-export const docsProjects = sqliteTable('docs_projects', {
+export const docsFolders = sqliteTable('docs_folders', {
   id: text('id').primaryKey(),
   tenantId: text('tenant_id').notNull(),
   ownerId: text('owner_id').notNull(),
@@ -47,7 +47,8 @@ export const docsDocuments = sqliteTable('docs_documents', {
   id: text('id').primaryKey(),
   tenantId: text('tenant_id').notNull(),
   ownerId: text('owner_id').notNull(),
-  projectId: text('project_id'),
+  /** Every document is filed under a folder — there is no root level. */
+  folderId: text('folder_id').notNull(),
   title: text('title').notNull(),
   slug: text('slug').notNull(),
   /** Canonical Markdown, autosaved directly (no separate draft row). */
@@ -56,7 +57,7 @@ export const docsDocuments = sqliteTable('docs_documents', {
   storage: text('storage', { enum: ['db', 'git'] })
     .notNull()
     .default('db'),
-  /** Path within the connected repo, once git-backed (e.g. `docs/<project>/<slug>.md`). */
+  /** Path within the connected repo, once git-backed (e.g. `docs/<folder>/<slug>.md`). */
   gitPath: text('git_path'),
   /** Last-synced git blob/commit SHA — backs conflict detection on the next sync. */
   baseSha: text('base_sha'),
@@ -95,17 +96,17 @@ export const docsDocumentMembers = sqliteTable(
 );
 
 /**
- * Project-level sharing (mirrors `docs_document_members`'s shape, not
+ * Folder-level sharing (mirrors `docs_document_members`'s shape, not
  * Kanban's `kanban_project_members` — Docs' own house style enum-
  * constrains `role` on SQLite and keeps the redundant explicit unique
- * index alongside the composite PK). A project role also gates access to
- * every document filed under that project (the "shared folder" model) —
- * see `resolveDocumentAccess()` in `_lib/documents.ts`.
+ * index alongside the composite PK). A folder role also gates access to
+ * every document filed under that folder (the "shared folder" model) —
+ * see `resolveDocumentRole()` in `_lib/documents.ts`.
  */
-export const docsProjectMembers = sqliteTable(
-  'docs_project_members',
+export const docsFolderMembers = sqliteTable(
+  'docs_folder_members',
   {
-    projectId: text('project_id').notNull(),
+    folderId: text('folder_id').notNull(),
     userId: text('user_id').notNull(),
     tenantId: text('tenant_id').notNull(),
     role: text('role', { enum: ['owner', 'editor', 'viewer'] }).notNull(),
@@ -113,29 +114,29 @@ export const docsProjectMembers = sqliteTable(
     joinedAt: integer('joined_at').notNull(),
   },
   (t) => [
-    primaryKey({ columns: [t.projectId, t.userId] }),
-    uniqueIndex('docs_project_members_project_user_idx').on(t.projectId, t.userId),
+    primaryKey({ columns: [t.folderId, t.userId] }),
+    uniqueIndex('docs_folder_members_folder_user_idx').on(t.folderId, t.userId),
   ],
 );
 
 export const docsTables = {
   docsDrives,
-  docsProjects,
+  docsFolders,
   docsDocuments,
   docsUserPrefs,
   docsDocumentMembers,
-  docsProjectMembers,
+  docsFolderMembers,
 };
 
 export type DocsDrive = InferSelectModel<typeof docsDrives>;
-export type DocsProject = InferSelectModel<typeof docsProjects>;
+export type DocsFolder = InferSelectModel<typeof docsFolders>;
 export type DocsDocument = InferSelectModel<typeof docsDocuments>;
 export type DocsUserPrefs = InferSelectModel<typeof docsUserPrefs>;
 export type DocsDocumentMember = InferSelectModel<typeof docsDocumentMembers>;
-export type DocsProjectMember = InferSelectModel<typeof docsProjectMembers>;
+export type DocsFolderMember = InferSelectModel<typeof docsFolderMembers>;
 export type NewDocsDrive = InferInsertModel<typeof docsDrives>;
-export type NewDocsProject = InferInsertModel<typeof docsProjects>;
+export type NewDocsFolder = InferInsertModel<typeof docsFolders>;
 export type NewDocsDocument = InferInsertModel<typeof docsDocuments>;
 export type NewDocsUserPrefs = InferInsertModel<typeof docsUserPrefs>;
 export type NewDocsDocumentMember = InferInsertModel<typeof docsDocumentMembers>;
-export type NewDocsProjectMember = InferInsertModel<typeof docsProjectMembers>;
+export type NewDocsFolderMember = InferInsertModel<typeof docsFolderMembers>;

@@ -12,8 +12,8 @@ import {
   docsDocumentMembers,
   docsDocuments,
   docsDrives,
-  docsProjectMembers,
-  docsProjects,
+  docsFolderMembers,
+  docsFolders,
   docsUserPrefs,
 } from '../_db/schema';
 
@@ -22,6 +22,12 @@ import {
 type Db = BaseSQLiteDatabase<'async', any, any>;
 
 const PLUGIN_ID = 'fs.sovereign.docs';
+// v4: renames `projects` -> `folders` and `ExportDocument.projectId` ->
+// `folderId` (now always present — every document is filed under a folder,
+// there's no root level). A v3 export's `projectId` could be `null`; that
+// shape is no longer valid, so the version bump invalidates old exports
+// cleanly via isDocsExportData's version check rather than trying to import
+// a null folder reference into a required field.
 // v3 (D-14): adds the per-user view preference (docs_user_prefs, D-10) and
 // each document's git-sync fields (D-12) to the export, and widens
 // documentMembers to a full picture — every member of a document you own,
@@ -29,7 +35,7 @@ const PLUGIN_ID = 'fs.sovereign.docs';
 // document is shared with (SPEC.md "Portability and deletion"). Import stays
 // additive-only and still re-normalizes storage to 'db' on every restored
 // document (a git mirror is never re-created without reconnecting a drive).
-const EXPORT_SCHEMA_VERSION = 3;
+const EXPORT_SCHEMA_VERSION = 4;
 
 /**
  * Registers Docs' export/import/delete participation (RFC 0007 / RFC 0033,
@@ -59,7 +65,7 @@ interface ExportDrive {
   createdAt: number;
 }
 
-interface ExportProject {
+interface ExportFolder {
   id: string;
   name: string;
   slug: string;
@@ -68,7 +74,7 @@ interface ExportProject {
 
 interface ExportDocument {
   id: string;
-  projectId: string | null;
+  folderId: string;
   title: string;
   slug: string;
   content: string;
@@ -92,7 +98,7 @@ interface DocsExportData {
   /** null when the user never connected a git drive. Informational only. */
   drive: ExportDrive | null;
   defaultView: 'markdown' | 'wysiwyg' | null;
-  projects: ExportProject[];
+  folders: ExportFolder[];
   documents: ExportDocument[];
   /**
    * Every member of a document this user owns (so they can see who they've
@@ -107,7 +113,7 @@ async function exportDocsData(ctx: ExportContext): Promise<PluginExportSection> 
   const db = (await sdk.db.getClient()) as Db;
   const { userId, tenantId } = ctx;
 
-  const [driveRows, prefsRows, projectRows, documentRows, ownMemberships] = await Promise.all([
+  const [driveRows, prefsRows, folderRows, documentRows, ownMemberships] = await Promise.all([
     db
       .select()
       .from(docsDrives)
@@ -118,8 +124,8 @@ async function exportDocsData(ctx: ExportContext): Promise<PluginExportSection> 
       .where(and(eq(docsUserPrefs.tenantId, tenantId), eq(docsUserPrefs.userId, userId))),
     db
       .select()
-      .from(docsProjects)
-      .where(and(eq(docsProjects.tenantId, tenantId), eq(docsProjects.ownerId, userId))),
+      .from(docsFolders)
+      .where(and(eq(docsFolders.tenantId, tenantId), eq(docsFolders.ownerId, userId))),
     db
       .select()
       .from(docsDocuments)
@@ -157,15 +163,15 @@ async function exportDocsData(ctx: ExportContext): Promise<PluginExportSection> 
       ? { branch: driveRow.branch, basePath: driveRow.basePath, createdAt: driveRow.createdAt }
       : null,
     defaultView: prefsRows[0]?.defaultView ?? null,
-    projects: projectRows.map((p) => ({
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      createdAt: p.createdAt,
+    folders: folderRows.map((f) => ({
+      id: f.id,
+      name: f.name,
+      slug: f.slug,
+      createdAt: f.createdAt,
     })),
     documents: documentRows.map((d) => ({
       id: d.id,
-      projectId: d.projectId,
+      folderId: d.folderId,
       title: d.title,
       slug: d.slug,
       content: d.content,
@@ -208,7 +214,7 @@ async function exportDocsData(ctx: ExportContext): Promise<PluginExportSection> 
 function isDocsExportData(value: unknown): value is DocsExportData {
   if (!value || typeof value !== 'object') return false;
   const c = value as Partial<DocsExportData>;
-  return Array.isArray(c.projects) && Array.isArray(c.documents);
+  return Array.isArray(c.folders) && Array.isArray(c.documents);
 }
 
 async function importDocsData(section: PluginExportSection, ctx: ImportContext): Promise<void> {
@@ -242,24 +248,24 @@ async function importDocsData(section: PluginExportSection, ctx: ImportContext):
     }
   }
 
-  const originalProjectIds = new Set(data.projects.map((p) => p.id));
+  const originalFolderIds = new Set(data.folders.map((f) => f.id));
 
-  for (const p of data.projects) {
-    const newProjectId = ctx.remapId(p.id);
-    await db.insert(docsProjects).values({
-      id: newProjectId,
+  for (const f of data.folders) {
+    const newFolderId = ctx.remapId(f.id);
+    await db.insert(docsFolders).values({
+      id: newFolderId,
       tenantId: ctx.tenantId,
       ownerId: ctx.userId,
-      name: p.name,
-      slug: p.slug,
-      createdAt: p.createdAt,
+      name: f.name,
+      slug: f.slug,
+      createdAt: f.createdAt,
     });
-    // Every project needs an owner membership row to be reachable at all —
-    // getProjectOverview/listDocumentsOverview both read through
-    // docs_project_members, not ownerId directly (mirrors the document
+    // Every folder needs an owner membership row to be reachable at all —
+    // getFolderOverview/listDocumentsOverview both read through
+    // docs_folder_members, not ownerId directly (mirrors the document
     // owner-membership insert below).
-    await db.insert(docsProjectMembers).values({
-      projectId: newProjectId,
+    await db.insert(docsFolderMembers).values({
+      folderId: newFolderId,
       userId: ctx.userId,
       tenantId: ctx.tenantId,
       role: 'owner',
@@ -269,12 +275,21 @@ async function importDocsData(section: PluginExportSection, ctx: ImportContext):
   }
 
   for (const d of data.documents) {
+    // Every document must have a folder — normally always one of this
+    // user's own exported folders (`exportDocsData` scopes both queries by
+    // `ownerId`), except for a document filed under a folder the exporting
+    // user only had editor access to (not ownership), which isn't in
+    // `data.folders`. There's nowhere to put such a document on import
+    // (no root level, and re-creating someone else's folder isn't this
+    // user's data to restore), so skip it rather than fabricate a folder.
+    if (!originalFolderIds.has(d.folderId)) continue;
+
     const newId = ctx.remapId(d.id);
     await db.insert(docsDocuments).values({
       id: newId,
       tenantId: ctx.tenantId,
       ownerId: ctx.userId,
-      projectId: d.projectId && originalProjectIds.has(d.projectId) ? ctx.remapId(d.projectId) : null,
+      folderId: ctx.remapId(d.folderId),
       title: d.title,
       slug: d.slug,
       content: d.content,
@@ -413,51 +428,47 @@ async function deleteAllDocsData(ctx: DeletionContext): Promise<DeletionResult> 
     }
   }
 
-  // Every project this user has a role on — owned or shared with them.
-  // Mirrors the per-document transfer logic above: a project this user
-  // doesn't own just loses their membership row; a project they do own
-  // gets handed to a successor member (preferring an existing project
+  // Every folder this user has a role on — owned or shared with them.
+  // Mirrors the per-document transfer logic above: a folder this user
+  // doesn't own just loses their membership row; a folder they do own
+  // gets handed to a successor member (preferring an existing folder
   // owner, else the earliest-joined member) so it survives its owner's
   // account deletion, same as a shared document does.
-  const projectMemberships = await db
+  const folderMemberships = await db
     .select()
-    .from(docsProjectMembers)
-    .where(
-      and(eq(docsProjectMembers.tenantId, ctx.tenantId), eq(docsProjectMembers.userId, ctx.userId)),
-    );
+    .from(docsFolderMembers)
+    .where(and(eq(docsFolderMembers.tenantId, ctx.tenantId), eq(docsFolderMembers.userId, ctx.userId)));
 
-  for (const membership of projectMemberships) {
-    const [project] = await db
-      .select({ id: docsProjects.id, ownerId: docsProjects.ownerId })
-      .from(docsProjects)
-      .where(
-        and(eq(docsProjects.id, membership.projectId), eq(docsProjects.tenantId, ctx.tenantId)),
-      );
+  for (const membership of folderMemberships) {
+    const [folder] = await db
+      .select({ id: docsFolders.id, ownerId: docsFolders.ownerId })
+      .from(docsFolders)
+      .where(and(eq(docsFolders.id, membership.folderId), eq(docsFolders.tenantId, ctx.tenantId)));
 
-    if (!project) {
-      // Dangling membership row with no project behind it.
+    if (!folder) {
+      // Dangling membership row with no folder behind it.
       await db
-        .delete(docsProjectMembers)
+        .delete(docsFolderMembers)
         .where(
           and(
-            eq(docsProjectMembers.tenantId, ctx.tenantId),
-            eq(docsProjectMembers.projectId, membership.projectId),
-            eq(docsProjectMembers.userId, ctx.userId),
+            eq(docsFolderMembers.tenantId, ctx.tenantId),
+            eq(docsFolderMembers.folderId, membership.folderId),
+            eq(docsFolderMembers.userId, ctx.userId),
           ),
         );
       deleted += 1;
       continue;
     }
 
-    if (project.ownerId !== ctx.userId) {
-      // A share on someone else's project — just leave it.
+    if (folder.ownerId !== ctx.userId) {
+      // A share on someone else's folder — just leave it.
       await db
-        .delete(docsProjectMembers)
+        .delete(docsFolderMembers)
         .where(
           and(
-            eq(docsProjectMembers.tenantId, ctx.tenantId),
-            eq(docsProjectMembers.projectId, project.id),
-            eq(docsProjectMembers.userId, ctx.userId),
+            eq(docsFolderMembers.tenantId, ctx.tenantId),
+            eq(docsFolderMembers.folderId, folder.id),
+            eq(docsFolderMembers.userId, ctx.userId),
           ),
         );
       deleted += 1;
@@ -466,12 +477,9 @@ async function deleteAllDocsData(ctx: DeletionContext): Promise<DeletionResult> 
 
     const allMembers = await db
       .select()
-      .from(docsProjectMembers)
+      .from(docsFolderMembers)
       .where(
-        and(
-          eq(docsProjectMembers.tenantId, ctx.tenantId),
-          eq(docsProjectMembers.projectId, project.id),
-        ),
+        and(eq(docsFolderMembers.tenantId, ctx.tenantId), eq(docsFolderMembers.folderId, folder.id)),
       );
     const successors = allMembers.filter((m) => m.userId !== ctx.userId);
 
@@ -481,55 +489,69 @@ async function deleteAllDocsData(ctx: DeletionContext): Promise<DeletionResult> 
         [...successors].sort((a, b) => a.joinedAt - b.joinedAt)[0];
       if (promotee) {
         await db
-          .update(docsProjects)
+          .update(docsFolders)
           .set({ ownerId: promotee.userId })
-          .where(and(eq(docsProjects.id, project.id), eq(docsProjects.tenantId, ctx.tenantId)));
+          .where(and(eq(docsFolders.id, folder.id), eq(docsFolders.tenantId, ctx.tenantId)));
         if (promotee.role !== 'owner') {
           await db
-            .update(docsProjectMembers)
+            .update(docsFolderMembers)
             .set({ role: 'owner' })
             .where(
               and(
-                eq(docsProjectMembers.tenantId, ctx.tenantId),
-                eq(docsProjectMembers.projectId, project.id),
-                eq(docsProjectMembers.userId, promotee.userId),
+                eq(docsFolderMembers.tenantId, ctx.tenantId),
+                eq(docsFolderMembers.folderId, folder.id),
+                eq(docsFolderMembers.userId, promotee.userId),
               ),
             );
         }
       }
       await db
-        .delete(docsProjectMembers)
+        .delete(docsFolderMembers)
         .where(
           and(
-            eq(docsProjectMembers.tenantId, ctx.tenantId),
-            eq(docsProjectMembers.projectId, project.id),
-            eq(docsProjectMembers.userId, ctx.userId),
+            eq(docsFolderMembers.tenantId, ctx.tenantId),
+            eq(docsFolderMembers.folderId, folder.id),
+            eq(docsFolderMembers.userId, ctx.userId),
           ),
         );
       deleted += 1;
     } else {
-      // Sole owner, no one else has access — nothing left to preserve.
-      // Reparent any documents still filed under it to root level first,
-      // so deleting the project doesn't leave a document pointing at a
-      // projectId that no longer exists (invisible: not on the root
-      // documents list, and its own project page 404s).
+      // Sole owner, no one else has access — nothing left to preserve. A
+      // document can no longer be reparented to a root level (folders are
+      // mandatory), so any document still filed under this folder is
+      // cascade-deleted along with it — including one owned by a different
+      // user who only had editor access to this folder, since there's
+      // nowhere left for it to live. This is a real behavior change from
+      // when folders were optional: deleting a sole-owner folder's account
+      // now also removes its contents, not just reparents them.
+      const orphanedDocs = await db
+        .select({ id: docsDocuments.id })
+        .from(docsDocuments)
+        .where(and(eq(docsDocuments.tenantId, ctx.tenantId), eq(docsDocuments.folderId, folder.id)));
+      if (orphanedDocs.length > 0) {
+        const orphanedDocIds = orphanedDocs.map((d) => d.id);
+        await db
+          .delete(docsDocumentMembers)
+          .where(
+            and(
+              eq(docsDocumentMembers.tenantId, ctx.tenantId),
+              inArray(docsDocumentMembers.documentId, orphanedDocIds),
+            ),
+          );
+        await db
+          .delete(docsDocuments)
+          .where(
+            and(eq(docsDocuments.tenantId, ctx.tenantId), inArray(docsDocuments.id, orphanedDocIds)),
+          );
+      }
       await db
-        .update(docsDocuments)
-        .set({ projectId: null })
+        .delete(docsFolderMembers)
         .where(
-          and(eq(docsDocuments.tenantId, ctx.tenantId), eq(docsDocuments.projectId, project.id)),
+          and(eq(docsFolderMembers.tenantId, ctx.tenantId), eq(docsFolderMembers.folderId, folder.id)),
         );
       await db
-        .delete(docsProjectMembers)
-        .where(
-          and(
-            eq(docsProjectMembers.tenantId, ctx.tenantId),
-            eq(docsProjectMembers.projectId, project.id),
-          ),
-        );
-      await db
-        .delete(docsProjects)
-        .where(and(eq(docsProjects.id, project.id), eq(docsProjects.tenantId, ctx.tenantId)));
+        .delete(docsFolders)
+        .where(and(eq(docsFolders.id, folder.id), eq(docsFolders.tenantId, ctx.tenantId)));
       deleted += 1;
     }
   }

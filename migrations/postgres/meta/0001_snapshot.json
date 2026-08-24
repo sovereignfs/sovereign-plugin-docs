@@ -1,5 +1,5 @@
 {
-  "id": "07e19289-5df6-4185-a12b-66f8c9604de3",
+  "id": "0ce7f726-5ed2-458a-9d4a-b3f38acd7f3e",
   "prevId": "af6f8f35-2a18-4a1c-8e9b-575584cb133d",
   "version": "7",
   "dialect": "postgresql",
@@ -83,6 +83,85 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.docs_folder_members": {
+      "name": "docs_folder_members",
+      "schema": "",
+      "columns": {
+        "folder_id": {
+          "name": "folder_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "invited_by": {
+          "name": "invited_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "joined_at": {
+          "name": "joined_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "docs_folder_members_folder_user_idx": {
+          "name": "docs_folder_members_folder_user_idx",
+          "columns": [
+            {
+              "expression": "folder_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "docs_folder_members_folder_id_user_id_pk": {
+          "name": "docs_folder_members_folder_id_user_id_pk",
+          "columns": [
+            "folder_id",
+            "user_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.docs_documents": {
       "name": "docs_documents",
       "schema": "",
@@ -105,11 +184,11 @@
           "primaryKey": false,
           "notNull": true
         },
-        "project_id": {
-          "name": "project_id",
+        "folder_id": {
+          "name": "folder_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "title": {
           "name": "title",
@@ -232,87 +311,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.docs_project_members": {
-      "name": "docs_project_members",
-      "schema": "",
-      "columns": {
-        "project_id": {
-          "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "role": {
-          "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "invited_by": {
-          "name": "invited_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "joined_at": {
-          "name": "joined_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "docs_project_members_project_user_idx": {
-          "name": "docs_project_members_project_user_idx",
-          "columns": [
-            {
-              "expression": "project_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {
-        "docs_project_members_project_id_user_id_pk": {
-          "name": "docs_project_members_project_id_user_id_pk",
-          "columns": [
-            "project_id",
-            "user_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.docs_projects": {
-      "name": "docs_projects",
+    "public.docs_folders": {
+      "name": "docs_folders",
       "schema": "",
       "columns": {
         "id": {

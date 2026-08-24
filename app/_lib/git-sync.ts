@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { sdk } from '@sovereignfs/sdk';
 import { and, eq } from 'drizzle-orm';
-import { docsDocuments, docsProjects } from '../_db/schema';
+import { docsDocuments, docsFolders } from '../_db/schema';
 import { getDrive } from './actions';
 import type { ActionResult } from './context';
 import { getContext, now } from './context';
@@ -17,7 +17,7 @@ interface DocRow {
   title: string;
   slug: string;
   content: string;
-  projectId: string | null;
+  folderId: string;
   storage: 'db' | 'git';
   gitPath: string | null;
   baseSha: string | null;
@@ -46,7 +46,7 @@ async function resolveGitContext(
       title: docsDocuments.title,
       slug: docsDocuments.slug,
       content: docsDocuments.content,
-      projectId: docsDocuments.projectId,
+      folderId: docsDocuments.folderId,
       storage: docsDocuments.storage,
       gitPath: docsDocuments.gitPath,
       baseSha: docsDocuments.baseSha,
@@ -55,7 +55,7 @@ async function resolveGitContext(
     .where(and(eq(docsDocuments.id, documentId), eq(docsDocuments.tenantId, tenantId)));
   if (!doc) return { ok: false, error: 'Document not found.' };
 
-  const role = await resolveDocumentRole(db, tenantId, userId, documentId, doc.projectId);
+  const role = await resolveDocumentRole(db, tenantId, userId, documentId, doc.folderId);
   if (!role) return { ok: false, error: 'Document not found.' };
   if (requireEdit && !canEditRole(role)) {
     return { ok: false, error: "You don't have permission to sync this document." };
@@ -78,15 +78,11 @@ async function resolveGitContext(
 async function resolveGitPath(doc: DocRow, drive: { basePath: string }) {
   if (doc.gitPath) return doc.gitPath;
   const { db, tenantId } = await getContext();
-  let projectSlug: string | null = null;
-  if (doc.projectId) {
-    const [project] = await db
-      .select({ slug: docsProjects.slug })
-      .from(docsProjects)
-      .where(and(eq(docsProjects.id, doc.projectId), eq(docsProjects.tenantId, tenantId)));
-    projectSlug = project?.slug ?? null;
-  }
-  return buildGitPath(drive.basePath, projectSlug, doc.slug);
+  const [folder] = await db
+    .select({ slug: docsFolders.slug })
+    .from(docsFolders)
+    .where(and(eq(docsFolders.id, doc.folderId), eq(docsFolders.tenantId, tenantId)));
+  return buildGitPath(drive.basePath, folder?.slug ?? doc.folderId, doc.slug);
 }
 
 /**
