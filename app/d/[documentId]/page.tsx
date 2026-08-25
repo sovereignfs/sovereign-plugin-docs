@@ -1,15 +1,15 @@
 import { notFound } from 'next/navigation';
-import { DocumentPage } from '../_components/DocumentPage';
-import { getDrive } from '../_lib/actions';
-import { getDocumentForEdit, saveDocument } from '../_lib/documents';
-import { getRevisionContent, listDocumentRevisions, syncDocumentToGit } from '../_lib/git-sync';
-import { getDefaultView, setDefaultView } from '../_lib/prefs';
+import { DocumentPage } from '../../_components/DocumentPage';
+import { getDrive } from '../../_lib/actions';
+import { getDocumentForEdit, saveDocument } from '../../_lib/documents';
+import { getRevisionContent, listDocumentRevisions, syncDocumentToGit } from '../../_lib/git-sync';
+import { getDefaultView, setDefaultView } from '../../_lib/prefs';
 import {
   inviteDocumentMember,
   listDocumentMembers,
   removeDocumentMember,
   searchDocumentDirectoryUsers,
-} from '../_lib/sharing';
+} from '../../_lib/sharing';
 
 interface DocumentRouteProps {
   params: Promise<{ documentId: string }>;

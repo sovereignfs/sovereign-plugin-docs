@@ -322,7 +322,7 @@ export interface FolderOverview {
 
 /**
  * Reads one folder and the documents filed under it, for the folder
- * detail route (`/docs/folders/[folderId]`, D-09). Returns `null` if the
+ * detail route (`/docs/f/[folderId]`, D-09). Returns `null` if the
  * folder doesn't exist, isn't in this tenant, or the current user has no
  * `docs_folder_members` role on it — the route 404s on that, same as
  * `getDocumentForEdit`. Documents are **not** filtered by `ownerId` here — a

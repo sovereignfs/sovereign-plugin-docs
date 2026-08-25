@@ -150,7 +150,7 @@ function FolderTile({
   shared?: boolean;
 }) {
   return (
-    <Link href={`/docs/folders/${folder.id}`}>
+    <Link href={`/docs/f/${folder.id}`}>
       <CardTile banner={<Icon name="folder" size="lg" aria-hidden={true} />}>
         <span className={styles.tileLabel}>{folder.name}</span>
         {shared && <span className={styles.tileBadge}>Shared</span>}
@@ -162,7 +162,7 @@ function FolderTile({
 function DocumentTile({ doc }: { doc: DocumentsOverview['documents'][number] }) {
   const badge = documentBadge(doc);
   return (
-    <Link href={`/docs/${doc.id}`}>
+    <Link href={`/docs/d/${doc.id}`}>
       <CardTile banner={<Icon name="file" size="lg" aria-hidden={true} />}>
         <span className={styles.tileLabel}>{doc.title}</span>
         {badge && <span className={styles.tileBadge}>{badge}</span>}
