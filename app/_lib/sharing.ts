@@ -27,7 +27,7 @@ async function notifyMember(
         recipientUserId,
         title: 'Shared a document with you',
         body: `You were added to "${documentTitle}" as ${role}.`,
-        url: `/docs/${documentId}`,
+        url: `/docs/d/${documentId}`,
       },
       await headers(),
     );
@@ -41,7 +41,7 @@ async function emailMember(email: string, documentTitle: string, documentId: str
     await sdk.mailer.send({
       to: email,
       subject: `You've been added to "${documentTitle}"`,
-      text: `You now have access to "${documentTitle}" in Sovereign Docs.\n\nOpen it: /docs/${documentId}`,
+      text: `You now have access to "${documentTitle}" in Sovereign Docs.\n\nOpen it: /docs/d/${documentId}`,
     });
   } catch {
     // See notifyMember's docblock.
@@ -197,7 +197,7 @@ export async function inviteDocumentMember(
     await emailMember(invitedUser.email, doc.title, documentId);
   }
 
-  revalidatePath(`/${documentId}`);
+  revalidatePath(`/d/${documentId}`);
   return { ok: true, message: `Added ${invitedUser.name ?? invitedUser.email} as ${roleInput}.` };
 }
 
@@ -237,6 +237,6 @@ export async function removeDocumentMember(
       ),
     );
 
-  revalidatePath(`/${documentId}`);
+  revalidatePath(`/d/${documentId}`);
   return { ok: true };
 }

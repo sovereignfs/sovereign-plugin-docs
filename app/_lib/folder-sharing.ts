@@ -28,7 +28,7 @@ async function notifyMember(
         recipientUserId,
         title: 'Shared a folder with you',
         body: `You were added to "${folderName}" as ${role}.`,
-        url: `/docs/folders/${folderId}`,
+        url: `/docs/f/${folderId}`,
       },
       await headers(),
     );
@@ -42,7 +42,7 @@ async function emailMember(email: string, folderName: string, folderId: string) 
     await sdk.mailer.send({
       to: email,
       subject: `You've been added to "${folderName}"`,
-      text: `You now have access to "${folderName}" in Sovereign Docs.\n\nOpen it: /docs/folders/${folderId}`,
+      text: `You now have access to "${folderName}" in Sovereign Docs.\n\nOpen it: /docs/f/${folderId}`,
     });
   } catch {
     // See notifyMember's docblock.
@@ -193,7 +193,7 @@ export async function inviteFolderMember(
     await emailMember(invitedUser.email, folder.name, folderId);
   }
 
-  revalidatePath(`/folders/${folderId}`);
+  revalidatePath(`/f/${folderId}`);
   return { ok: true, message: `Added ${invitedUser.name ?? invitedUser.email} as ${roleInput}.` };
 }
 
@@ -231,6 +231,6 @@ export async function removeFolderMember(
       ),
     );
 
-  revalidatePath(`/folders/${folderId}`);
+  revalidatePath(`/f/${folderId}`);
   return { ok: true };
 }

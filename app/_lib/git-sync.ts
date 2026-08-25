@@ -133,7 +133,7 @@ export async function syncDocumentToGit(
 
     await sdk.connections.markUsed(drive.connectionId);
     revalidatePath('/');
-    revalidatePath(`/${documentId}`);
+    revalidatePath(`/d/${documentId}`);
     return { ok: true, message: 'Synced to Git.' };
   } catch (error) {
     if (error instanceof GitProviderError) {

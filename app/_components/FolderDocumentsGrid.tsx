@@ -28,7 +28,7 @@ export function FolderDocumentsGrid({
   return (
     <CardTileGrid>
       {documents.map((doc) => (
-        <Link key={doc.id} href={`/docs/${doc.id}`}>
+        <Link key={doc.id} href={`/docs/d/${doc.id}`}>
           <CardTile banner={<Icon name="file" size="lg" aria-hidden={true} />}>
             <span className={styles.tileLabel}>{doc.title}</span>
             {doc.storage === 'git' && <span className={styles.tileBadge}>Git</span>}
