@@ -26,11 +26,13 @@ export function FolderDocumentsGrid({
   canEdit,
 }: FolderDocumentsGridProps) {
   return (
-    <CardTileGrid>
+    <CardTileGrid dense minTileWidth={160}>
       {documents.map((doc) => (
-        <Link key={doc.id} href={`/docs/d/${doc.id}`}>
-          <CardTile banner={<Icon name="file" size="lg" aria-hidden={true} />}>
-            <span className={styles.tileLabel}>{doc.title}</span>
+        <Link key={doc.id} href={`/docs/d/${doc.id}`} className={styles.tileLink}>
+          <CardTile variant="icon" banner={<Icon name="file-text" size="lg" aria-hidden={true} />}>
+            <span className={styles.tileLabel} title={doc.title}>
+              {doc.title}
+            </span>
             {doc.storage === 'git' && <span className={styles.tileBadge}>Git</span>}
           </CardTile>
         </Link>
@@ -39,7 +41,9 @@ export function FolderDocumentsGrid({
         <CreateDocumentDialog
           folderId={folderId}
           driveConnected={driveConnected}
-          renderTrigger={({ onClick }) => <NewCardTile label="New document" onClick={onClick} />}
+          renderTrigger={({ onClick }) => (
+            <NewCardTile variant="icon" label="New" onClick={onClick} />
+          )}
         />
       )}
     </CardTileGrid>

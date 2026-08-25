@@ -305,13 +305,20 @@
   box-shadow: var(--sv-shadow-card);
 }
 
+/* No `resize` declared here — `Textarea`'s `autoGrow` prop (DocumentPage.tsx)
+   already sets `resize: none; overflow: hidden;` via its own
+   `.textareaAutoGrow` class and drives height from content via
+   `scrollHeight`, growing the box to match `.pageCard`'s (which has no
+   `max-height`, only `min-height`) instead of internally scrolling — a
+   drag handle here would fight that and previously left `min-height`
+   (420px) as the box's effective ceiling for any document longer than one
+   screen, forcing the scrollbar into this small box instead of the page. */
 .body {
   display: block;
   width: 100%;
   min-height: 420px;
   border: none;
   padding: var(--sv-space-8);
-  resize: vertical;
   font-size: var(--sv-font-size-md);
   line-height: 1.7;
   background: transparent;

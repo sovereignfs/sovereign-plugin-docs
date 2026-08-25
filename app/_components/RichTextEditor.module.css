@@ -138,42 +138,43 @@
    instead — no deliberate hierarchy, and too close to `--sv-font-size-md`
    body text to read as a heading at all) — mapped onto the existing DS
    scale rather than inventing new tokens, matching a numbered-section
-   document like Google Docs' own Heading 1/2/3 styles. */
+   document like Google Docs' own Heading 1/2/3 styles. Selectors are keyed
+   to the markdown heading level (`h1` = level 1 = "Title"), per
+   RichTextEditor.tsx's `PARAGRAPH_STYLES` — see that file's comment for why
+   Title/Heading 1-3/Subtitle sit at levels 1-5 in that order, rather than
+   Title/Subtitle living at 4/5 as an earlier version had them. */
 .prose :global(h1) {
-  margin: var(--sv-space-6) 0 var(--sv-space-3);
-  font-size: var(--sv-font-size-2xl);
-  font-weight: var(--sv-font-weight-bold);
-  line-height: 1.3;
-}
-
-.prose :global(h2) {
-  margin: var(--sv-space-5) 0 var(--sv-space-2);
-  font-size: var(--sv-font-size-xl);
-  font-weight: var(--sv-font-weight-bold);
-  line-height: 1.3;
-}
-
-.prose :global(h3) {
-  margin: var(--sv-space-4) 0 var(--sv-space-2);
-  font-size: var(--sv-font-size-lg);
-  font-weight: var(--sv-font-weight-semibold);
-  line-height: 1.3;
-}
-
-/* "Title"/"Subtitle" (PARAGRAPH_STYLES levels 4/5 in RichTextEditor.tsx —
-   see that file's comment for why they live at those levels rather than 1/2).
-   Title reads bigger than Heading 1 despite nominally being a deeper
-   markdown heading — visual size here is a plain CSS choice, decoupled from
-   the heading-level number. Subtitle sits close beneath it (no top margin)
-   and reads as de-emphasized body text, not another heading, matching
-   Google Docs' own muted, regular-weight Subtitle style. */
-.prose :global(h4) {
   margin: var(--sv-space-6) 0 var(--sv-space-2);
   font-size: var(--sv-font-size-3xl);
   font-weight: var(--sv-font-weight-bold);
   line-height: 1.2;
 }
 
+.prose :global(h2) {
+  margin: var(--sv-space-6) 0 var(--sv-space-3);
+  font-size: var(--sv-font-size-2xl);
+  font-weight: var(--sv-font-weight-bold);
+  line-height: 1.3;
+}
+
+.prose :global(h3) {
+  margin: var(--sv-space-5) 0 var(--sv-space-2);
+  font-size: var(--sv-font-size-xl);
+  font-weight: var(--sv-font-weight-bold);
+  line-height: 1.3;
+}
+
+.prose :global(h4) {
+  margin: var(--sv-space-4) 0 var(--sv-space-2);
+  font-size: var(--sv-font-size-lg);
+  font-weight: var(--sv-font-weight-semibold);
+  line-height: 1.3;
+}
+
+/* Subtitle (level 5, unchanged from the earlier scheme) sits close beneath
+   whatever heading precedes it (no top margin) and reads as de-emphasized
+   body text, not another heading, matching Google Docs' own muted,
+   regular-weight Subtitle style. */
 .prose :global(h5) {
   margin: 0 0 var(--sv-space-5);
   font-size: var(--sv-font-size-xl);
@@ -208,10 +209,15 @@
   border-top: 1px solid var(--sv-color-border);
 }
 
+/* `font-size: sm` (not the inherited `--sv-font-size-md` body size) —
+   monospace glyphs read visually larger/wider than proportional text at the
+   same nominal size, so `code` left at the body's own size looked
+   oversized next to it, most noticeably in a multi-line ```code block. */
 .prose :global(code) {
   border-radius: var(--sv-radius-sm);
   background: var(--sv-color-surface-sunken);
   font-family: var(--sv-font-family-mono);
+  font-size: var(--sv-font-size-sm);
   padding: 0 var(--sv-space-1);
 }
 
@@ -262,6 +268,17 @@
   padding: var(--sv-space-2) var(--sv-space-3);
   text-align: left;
   vertical-align: top;
+  line-height: 1.4;
+}
+
+/* TipTap's Table extension wraps cell content in a `<p>`, which otherwise
+   inherits `.prose :global(p)`'s `margin: 0 0 var(--sv-space-3)` (sized for
+   spacing between body paragraphs) — inside a cell that reads as extra
+   bottom padding under every row, on top of the cell's own, making a
+   multi-line table look far taller/airier than the surrounding prose. */
+.prose :global(td p),
+.prose :global(th p) {
+  margin: 0;
 }
 
 .prose :global(th) {

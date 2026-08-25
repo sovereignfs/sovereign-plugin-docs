@@ -26,7 +26,16 @@ export default async function DocumentRoute({ params }: DocumentRouteProps) {
 
   return (
     <DocumentPage
+      // `documentId` as key forces a remount when navigating between two
+      // different documents (a client-side `Link` nav reuses the same
+      // component instance otherwise, since it's the same route segment) —
+      // without it, DocumentPage's `useState(initialTitle)`/
+      // `useState(initialContent)` only run their initializer on the very
+      // first mount, so a new document's title/content never actually
+      // replaces whatever the previously-open document left in state.
+      key={documentId}
       title={document.title}
+      folderId={document.folderId}
       slug={document.slug}
       content={document.content}
       storage={document.storage}

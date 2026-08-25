@@ -1,17 +1,17 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { EmptyState, PageHeader } from '@sovereignfs/ui';
-import { CreateDocumentDialog } from '../../_components/CreateDocumentDialog';
-import { FolderDocumentsGrid } from '../../_components/FolderDocumentsGrid';
-import { FolderShareButton } from '../../_components/FolderShareButton';
-import { getDrive } from '../../_lib/actions';
-import { getFolderOverview } from '../../_lib/documents';
+import { CreateDocumentDialog } from '../../../_components/CreateDocumentDialog';
+import { FolderDocumentsGrid } from '../../../_components/FolderDocumentsGrid';
+import { FolderShareButton } from '../../../_components/FolderShareButton';
+import { getDrive } from '../../../_lib/actions';
+import { getFolderOverview } from '../../../_lib/documents';
 import {
   inviteFolderMember,
   listFolderMembers,
   removeFolderMember,
   searchFolderDirectoryUsers,
-} from '../../_lib/folder-sharing';
+} from '../../../_lib/folder-sharing';
 import styles from './page.module.css';
 
 interface FolderPageProps {
@@ -30,11 +30,12 @@ export default async function FolderPage({ params }: FolderPageProps) {
   return (
     <div className={styles.page}>
       <Link href="/docs" className={styles.backLink}>
-        ← Docs
+        ← Folders
       </Link>
 
       <PageHeader
         title={folder.name}
+        icon="folder-open"
         action={
           folder.role === 'owner' ? (
             <FolderShareButton
