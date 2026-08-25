@@ -1,8 +1,34 @@
+.tileLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* `display: inline-block` is what makes this centered AND correctly
+   truncatable at once — see `CardTileGrid`'s `.gridDense` rule
+   (packages/ui's CardTile.module.css) for why every tile in this grid now
+   gets a uniform, fixed column width instead of one sized to its own
+   content. A `block` label always fills its parent's full width, so the
+   `text-align: center` inherited from `.tileIcon .footer` (also
+   packages/ui's CardTile) centers the *text run inside an already-full-
+   width box* — for `nowrap` text wider than that box, `overflow: hidden`
+   clips the start and end symmetrically instead of truncating from the end
+   (`text-overflow: ellipsis` only ever renders at the inline-end edge,
+   which isn't the edge actually being cut when centered). An
+   `inline-block`, by contrast, shrinks to fit its own content up to
+   `max-width` — short names size to exactly their own width and get
+   centered as a single unit by the ancestor's `text-align: center` (this
+   rule intentionally does NOT set its own `text-align`, so that inherited
+   centering keeps working); long names grow to the `max-width` cap and,
+   *inside that now-fixed box*, the text still renders left-to-right from
+   the start, so the ellipsis correctly lands at the box's own right edge.
+   `max-width: 100%` is reliable here specifically because every ancestor up
+   to the grid track is now a fixed width, not an intrinsic-sizing result. */
 .tileLabel {
-  display: block;
+  display: inline-block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
   color: var(--sv-color-text-primary);
   font-weight: 500;
 }

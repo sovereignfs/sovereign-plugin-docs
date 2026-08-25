@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useActionState, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { Button, Icon, Input, Menu, SegmentedControl, Textarea } from '@sovereignfs/ui';
 import type { MenuEntry } from '@sovereignfs/ui';
 import type { DirectoryUser } from '@sovereignfs/sdk';
@@ -24,6 +25,8 @@ type SyncStatus = 'synced' | 'pending' | 'conflict' | null;
 interface DocumentPageProps {
   title: string;
   slug: string;
+  /** The folder this document is filed under — the back link returns here, not the plugin's top-level Home. */
+  folderId: string;
   content: string;
   storage: Storage;
   syncStatus: SyncStatus;
@@ -78,6 +81,7 @@ const MODE_OPTIONS: { label: string; value: Mode }[] = [
 export function DocumentPage({
   title: initialTitle,
   slug,
+  folderId,
   content: initialContent,
   storage,
   syncStatus: initialSyncStatus,
@@ -134,6 +138,11 @@ export function DocumentPage({
   // behind the mirror before resizing.
   const titleMirrorRef = useRef<HTMLSpanElement>(null);
   const [titleInputWidth, setTitleInputWidth] = useState<number>();
+  // Hidden file input Import's button click proxies to — a styled `Button`
+  // can't itself be a file picker, so this is the same "invisible control,
+  // triggered programmatically" pattern the Sync-to-Git hidden `<form>`
+  // below already uses.
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const isEditing = canEdit && mode === 'edit';
   const isDirty = title !== lastSaved.title || content !== lastSaved.content;
@@ -141,7 +150,16 @@ export function DocumentPage({
   useLayoutEffect(() => {
     const el = titleMirrorRef.current;
     if (!el) return;
-    setTitleInputWidth(el.offsetWidth);
+    // +6px buffer — the mirror `<span>` and the real `<input>` have
+    // identical CSS (font/padding/border), but browsers don't measure the
+    // two element types with pixel-identical text-layout math: live-tested
+    // this exact undershoot at ~4px for a real semibold 20px title
+    // ("Q4 Retrospective" truncated to "Q4 Retrospecti…" at the mirror's
+    // raw `offsetWidth`, despite `.metaBar` having hundreds of spare px) —
+    // widening the input by a few px past the measured value fixed it with
+    // margin to spare. `offsetWidth` also rounds to a whole pixel, which
+    // alone can round a fraction of a px short of what's actually needed.
+    setTitleInputWidth(el.offsetWidth + 6);
   }, [title]);
 
   useEffect(() => {
@@ -192,7 +210,7 @@ export function DocumentPage({
     void setDefaultViewAction(next);
   }
 
-  function handleDownload() {
+  function handleExport() {
     const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -200,6 +218,37 @@ export function DocumentPage({
     link.download = `${slug}.md`;
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  function handleImportClick() {
+    importInputRef.current?.click();
+  }
+
+  function handleImportFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Reset now (not just on success) so picking the same filename twice in
+    // a row still fires this handler the second time — the browser only
+    // emits `change` when the input's value actually differs.
+    event.target.value = '';
+    if (!file) return;
+    if (
+      content.trim().length > 0 &&
+      !window.confirm(`Replace the current content with "${file.name}"? This can't be undone.`)
+    ) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setContent(typeof reader.result === 'string' ? reader.result : '');
+      // Land on Markdown view, not whichever view was active — Rich text's
+      // `RichTextEditor` only reads `content` once at mount (see this
+      // component's own top comment), so switching into it without a fresh
+      // mount would leave the editor showing the pre-import text even
+      // though `content` state has already moved on.
+      setMode('edit');
+      setView('markdown');
+    };
+    reader.readAsText(file);
   }
 
   const statusLine = statusLineText({
@@ -210,7 +259,7 @@ export function DocumentPage({
     syncPending,
   });
 
-  // Download is its own button (below), not a menu item — Sync/Revisions
+  // Import/Export are their own buttons (below), not menu items — Sync/Revisions
   // are the only candidates left for the overflow menu, so it's built fresh
   // on every render (not memoized: cheap, and a `useMemo` deps array
   // covering canEdit/driveConnected/storageTier/syncPending is more to keep
@@ -254,7 +303,7 @@ export function DocumentPage({
       <div className={styles.stickyChrome}>
         <div className={styles.secondaryHeader}>
           <div className={styles.metaBar}>
-            <Link href="/docs" className={styles.backLink} aria-label="Back to Docs">
+            <Link href={`/docs/f/${folderId}`} className={styles.backLink} aria-label="Back to folder">
               <Icon name="chevron-left" size="md" aria-hidden />
           </Link>
 
@@ -318,8 +367,25 @@ export function DocumentPage({
                 `useActionState`-bound submission still needs an actual
                 `<form action>` to fire against. */}
             <form ref={syncFormRef} action={syncFormAction} className={styles.hiddenForm} />
-            <Button type="button" variant="secondary" size="sm" onClick={handleDownload}>
-              Download
+            {canEdit && (
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".md,.markdown,text/markdown,text/plain"
+                className={styles.hiddenForm}
+                onChange={handleImportFileChange}
+                aria-label="Import document file"
+              />
+            )}
+            {canEdit && (
+              <Button type="button" variant="secondary" size="sm" onClick={handleImportClick}>
+                <Icon name="upload" size="sm" aria-hidden />
+                Import
+              </Button>
+            )}
+            <Button type="button" variant="secondary" size="sm" onClick={handleExport}>
+              <Icon name="download" size="sm" aria-hidden />
+              Export
             </Button>
             {overflowItems.length > 0 && (
               <Menu
@@ -344,6 +410,7 @@ export function DocumentPage({
             )}
             {isOwner && (
               <Button type="button" size="sm" onClick={() => setShareOpen(true)}>
+                <Icon name="share-2" size="sm" aria-hidden />
                 Share
               </Button>
             )}
@@ -386,6 +453,7 @@ export function DocumentPage({
               placeholder="Start writing in Markdown…"
               aria-label="Document content"
               rows={24}
+              autoGrow
             />
           ) : (
             // Conditional rendering (not a `key`) is what remounts this fresh

@@ -2,9 +2,8 @@
   "schemaVersion": 1,
   "id": "fs.sovereign.docs",
   "name": "Docs",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A privacy-first document workspace.",
-  "development": true,
   "type": "sovereign",
   "runtime": "native",
   "routePrefix": "/docs",
@@ -29,6 +28,6 @@
   },
   "repository": "https://github.com/sovereignfs/sovereign-plugin-docs",
   "compatibility": {
-    "minPlatformVersion": "0.75.0"
+    "minPlatformVersion": "0.97.4"
   }
 }

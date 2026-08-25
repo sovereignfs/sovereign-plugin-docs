@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { PageHeader } from '@sovereignfs/ui';
-import { ConnectDriveForm } from '../_components/ConnectDriveForm';
-import { DriveStatusCard } from '../_components/DriveStatusCard';
-import { getDrive } from '../_lib/actions';
+import { ConnectDriveForm } from '../../_components/ConnectDriveForm';
+import { DriveStatusCard } from '../../_components/DriveStatusCard';
+import { getDrive } from '../../_lib/actions';
 import styles from './page.module.css';
 
 /**

@@ -149,27 +149,32 @@ export function RichTextEditor({
   );
 }
 
-// Levels 4/5 are given over to "Title"/"Subtitle" rather than a literal 4th/
-// 5th outline heading, matching Google Docs' own paragraph-style menu
-// (Normal text / Title / Subtitle / Heading 1-3). Deliberately NOT levels 1/2
-// (which would collide with the existing Heading 1/Heading 2 mapping and
-// silently reinterpret every `#`/`##` in already-authored documents) — H1-H3
-// keep their current meaning untouched; Title/Subtitle just borrow otherwise
-// idle, already-enabled heading levels (StarterKit's Heading extension
-// defaults to levels 1-6) purely as a serialization slot. Visual size is a
-// pure CSS choice (RichTextEditor.module.css's `h4`/`h5` rules), independent
-// of the markdown heading-level number, so "Title" reads bigger than
-// "Heading 1" despite living at a nominally deeper level. Trade-off: a `.md`
-// export opened in a third-party renderer (GitHub, VS Code preview) will
-// show Title/Subtitle as small, deeply-nested headings rather than the large
-// title treatment this app renders — not lossless outside this editor.
+// Title/Heading 1-3/Subtitle map onto real markdown heading levels 1-5, in
+// that reading order, matching Google Docs' own paragraph-style menu (Normal
+// text / Title / Subtitle / Heading 1-3): `#` is Title, `##`/`###`/`####`
+// are Heading 1-3, `#####` is Subtitle. An earlier version placed Title/
+// Subtitle at levels 4/5 specifically to avoid this reinterpretation risk —
+// but that meant a document's own top-level heading always serialized as
+// `####`/`#####` even when styled "Title" or opened via Import/Sync-to-Git,
+// which reads as broken to anyone inspecting the raw Markdown or opening it
+// in a third-party renderer (GitHub, VS Code preview), where it would show
+// as a small, deeply-nested heading instead of a proper `#` title. This
+// mapping trades that away for the more expected one: a plain `#`/`##`/`###`
+// authored outside this editor (or already stored from before this change)
+// now reads as Title/Heading 1/Heading 2 rather than Heading 1/Heading 2/
+// Heading 3 — a one-time reinterpretation of existing content, accepted
+// since nothing in this app parses/relies on the old level assignments
+// elsewhere (content is stored and moved as an opaque Markdown string
+// throughout, e.g. `portability.ts`'s export/import). Visual size is a pure
+// CSS choice (RichTextEditor.module.css's `h1`-`h5` rules), independent of
+// which label maps to which level — see that file's own comment.
 const PARAGRAPH_STYLES = [
   { label: 'Normal text', level: 0 },
-  { label: 'Title', level: 4 },
+  { label: 'Title', level: 1 },
   { label: 'Subtitle', level: 5 },
-  { label: 'Heading 1', level: 1 },
-  { label: 'Heading 2', level: 2 },
-  { label: 'Heading 3', level: 3 },
+  { label: 'Heading 1', level: 2 },
+  { label: 'Heading 2', level: 3 },
+  { label: 'Heading 3', level: 4 },
 ] as const;
 
 function FormattingRibbon({ editor, readOnly }: { editor: Editor; readOnly: boolean }) {

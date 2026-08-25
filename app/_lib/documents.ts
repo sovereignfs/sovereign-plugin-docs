@@ -224,9 +224,13 @@ export interface DocumentsOverview {
 }
 
 /**
- * Reads the current user's folders/documents plus the quota state, for the
- * plugin index page. `drive` is passed in (rather than fetched here) so a
- * caller that already has it (e.g. the index page) doesn't pay for a second
+ * Reads the current user's folders/documents plus the quota state. Called
+ * from three places: `app/(home)/layout.tsx` (the sidebar's "My
+ * Folders"/"Shared with me" quick-access rows), `app/(home)/page.tsx` (the
+ * Home page's own folder grid), and `app/(home)/inbox/page.tsx` (Inbox's
+ * "shared with you" digest — reuses the same `folders`/`documents` shape,
+ * filtered to non-owned). `drive` is passed in (rather than fetched here)
+ * so a caller that already has it doesn't pay for a second
  * `sdk.connections` round trip.
  *
  * Documents are read through `docs_document_members` (which already holds
@@ -240,13 +244,13 @@ export interface DocumentsOverview {
  *
  * Folders are read the same way through `docs_folder_members`, so a folder
  * shared with this user surfaces here too, each carrying its resolved
- * `role` for the home page's "My folders"/"Shared with me" split.
- * `documents` only ever holds documents individually shared with this user
- * (D-13) — every document now always has a folder, so an owned document is
- * never shown here; it's reachable by opening its folder instead. A
- * document reachable purely via folder role (the "shared folder" fallback
- * in `resolveDocumentRole`) stays out of this list too, for the same
- * reason.
+ * `role` for the "My folders"/"Shared with me" split (used by both the
+ * sidebar and the Home page's main content). `documents` only ever holds
+ * documents individually shared with this user (D-13) — every document now
+ * always has a folder, so an owned document is never shown here; it's
+ * reachable by opening its folder instead. A document reachable purely via
+ * folder role (the "shared folder" fallback in `resolveDocumentRole`) stays
+ * out of this list too, for the same reason.
  */
 export async function listDocumentsOverview(drive: DriveView | null): Promise<DocumentsOverview> {
   const { db, userId, tenantId } = await getContext();
@@ -356,6 +360,8 @@ export interface DocumentEditorData {
   content: string;
   storage: 'db' | 'git';
   syncStatus: 'synced' | 'pending' | 'conflict' | null;
+  /** The folder this document is filed under — every document has one. Used by the editor's back link, which returns to this folder rather than the plugin's top-level Home. */
+  folderId: string;
   /** The current user's `docs_document_members` role — 'owner' gates the Share dialog (D-13). */
   role: 'owner' | 'editor' | 'viewer';
   /** Whether the current user's membership role permits editing (owner/editor, not viewer). */
@@ -391,8 +397,7 @@ export async function getDocumentForEdit(documentId: string): Promise<DocumentEd
   const role = await resolveDocumentRole(db, tenantId, userId, documentId, doc.folderId);
   if (!role) return null;
 
-  const { folderId: _folderId, ...docFields } = doc;
-  return { ...docFields, role, canEdit: canEditRole(role) };
+  return { ...doc, role, canEdit: canEditRole(role) };
 }
 
 /**
@@ -432,5 +437,6 @@ export async function saveDocument(documentId: string, formData: FormData): Prom
     .where(and(eq(docsDocuments.id, documentId), eq(docsDocuments.tenantId, tenantId)));
 
   revalidatePath('/');
+  revalidatePath(`/d/${documentId}`);
   return { ok: true };
 }

@@ -1,0 +1,6 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sv-space-6);
+  padding: var(--sv-space-6);
+}
