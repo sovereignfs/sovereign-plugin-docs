@@ -35,7 +35,7 @@ export default async function InboxPage() {
           {sharedFolders.length > 0 && (
             <div>
               <h2 className={styles.heading}>Folders shared with you</h2>
-              <CardTileGrid dense minTileWidth={100}>
+              <CardTileGrid dense minTileWidth={160}>
                 {sharedFolders.map((folder) => (
                   <FolderTile key={folder.id} folder={folder} />
                 ))}
@@ -46,7 +46,7 @@ export default async function InboxPage() {
           {sharedDocuments.length > 0 && (
             <div>
               <h2 className={styles.heading}>Documents shared with you</h2>
-              <CardTileGrid>
+              <CardTileGrid dense minTileWidth={160}>
                 {sharedDocuments.map((doc) => (
                   <DocumentTile key={doc.id} doc={doc} />
                 ))}
@@ -63,7 +63,9 @@ function FolderTile({ folder }: { folder: DocumentsOverview['folders'][number] }
   return (
     <Link href={`/docs/f/${folder.id}`} className={styles.tileLink}>
       <CardTile variant="icon" banner={<Icon name="folder-closed" size="lg" aria-hidden={true} />}>
-        <span className={styles.tileLabel}>{folder.name}</span>
+        <span className={styles.tileLabel} title={folder.name}>
+          {folder.name}
+        </span>
       </CardTile>
     </Link>
   );
@@ -71,9 +73,11 @@ function FolderTile({ folder }: { folder: DocumentsOverview['folders'][number] }
 
 function DocumentTile({ doc }: { doc: DocumentsOverview['documents'][number] }) {
   return (
-    <Link href={`/docs/d/${doc.id}`}>
-      <CardTile banner={<Icon name="file" size="lg" aria-hidden={true} />}>
-        <span className={styles.tileLabel}>{doc.title}</span>
+    <Link href={`/docs/d/${doc.id}`} className={styles.tileLink}>
+      <CardTile variant="icon" banner={<Icon name="file-text" size="lg" aria-hidden={true} />}>
+        <span className={styles.tileLabel} title={doc.title}>
+          {doc.title}
+        </span>
         {doc.storage === 'git' && <span className={styles.tileBadge}>Git</span>}
       </CardTile>
     </Link>
