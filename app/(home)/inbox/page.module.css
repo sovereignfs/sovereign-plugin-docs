@@ -23,11 +23,19 @@
   text-decoration: none;
 }
 
+/* `display: inline-block` + `max-width: 100%` — see
+   FolderDocumentsGrid.module.css's identical rule (and `CardTileGrid`'s
+   `.gridDense` rule in packages/ui's CardTile.module.css) for the full
+   explanation: `inline-block` is what lets short names get centered as a
+   unit by the inherited `text-align: center` (packages/ui's CardTile) while
+   long names still truncate correctly from the end; `max-width: 100%` is
+   reliable because every dense-grid tile is now a uniform, fixed width. */
 .tileLabel {
-  display: block;
+  display: inline-block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
   color: var(--sv-color-text-primary);
   font-weight: 500;
 }
