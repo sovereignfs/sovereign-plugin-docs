@@ -95,21 +95,21 @@ Still genuinely absent (confirmed no code):
 
 ## Identity and manifest
 
-| Property                           | Value                                                                                  |
-| ---------------------------------- | -------------------------------------------------------------------------------------- |
-| `id`                               | `fs.sovereign.docs`                                                                    |
-| `name`                             | `Docs`                                                                                 |
-| `type`                             | `sovereign`                                                                            |
-| `runtime`                          | `native`                                                                               |
-| `routePrefix`                      | `/docs`                                                                                |
-| `shell`                            | `default` (editor view collapses the chrome — consistent with sibling `type: sovereign` plugins) |
-| `adminOnly`                        | omitted (`false`)                                                                      |
-| `icon`                             | `icon.svg`                                                                             |
+| Property                           | Value                                                                                                             |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `id`                               | `fs.sovereign.docs`                                                                                               |
+| `name`                             | `Docs`                                                                                                            |
+| `type`                             | `sovereign`                                                                                                       |
+| `runtime`                          | `native`                                                                                                          |
+| `routePrefix`                      | `/docs`                                                                                                           |
+| `shell`                            | `default` (editor view collapses the chrome — consistent with sibling `type: sovereign` plugins)                  |
+| `adminOnly`                        | omitted (`false`)                                                                                                 |
+| `icon`                             | `icon.svg`                                                                                                        |
 | `permissions`                      | `auth:session`, `db:readWrite`, `mailer:send`, `notifications:send`, `data:provide`, `data:export`, `data:import` |
-| `env`                              | `FREE_DOC_LIMIT` (see [Document quota](#document-quota))                                |
-| `connections`                      | `github` provider (only needed once OAuth lands — D-18)                                 |
-| `repository`                       | `https://github.com/sovereignfs/sovereign-plugin-docs`                                        |
-| `compatibility.minPlatformVersion` | `0.19.0`; public document routes additionally need RFC 0042, not yet landed             |
+| `env`                              | `FREE_DOC_LIMIT` (see [Document quota](#document-quota))                                                          |
+| `connections`                      | `github` provider (only needed once OAuth lands — D-18)                                                           |
+| `repository`                       | `https://github.com/sovereignfs/sovereign-plugin-docs`                                                            |
+| `compatibility.minPlatformVersion` | `0.19.0`; public document routes additionally need RFC 0042, not yet landed                                       |
 
 Manifest additions for v0.3 (added by the quota task, D-06):
 
@@ -142,10 +142,10 @@ There are two storage tiers for a document. Both store the **canonical Markdown 
 the plugin database**; they differ in whether that Markdown is also mirrored to a
 git repository.
 
-| Tier | Canonical content | Requires a drive? | Counts against quota? | Revisions | "It's just Markdown files" |
-| --- | --- | --- | --- | --- | --- |
-| **Local** (default, free) | Plugin DB (`docs_documents.content`) | No | **Yes** | `updated_at` (v1); full history later | Export/download `.md` any time |
-| **Git-backed** (opt-in) | Plugin DB, synced to git on demand | Yes | No | Git commit history | ✅ real, browsable `.md` tree in your repo |
+| Tier                      | Canonical content                    | Requires a drive? | Counts against quota? | Revisions                             | "It's just Markdown files"                 |
+| ------------------------- | ------------------------------------ | ----------------- | --------------------- | ------------------------------------- | ------------------------------------------ |
+| **Local** (default, free) | Plugin DB (`docs_documents.content`) | No                | **Yes**               | `updated_at` (v1); full history later | Export/download `.md` any time             |
+| **Git-backed** (opt-in)   | Plugin DB, synced to git on demand   | Yes               | No                    | Git commit history                    | ✅ real, browsable `.md` tree in your repo |
 
 **Why document bodies live in the DB, not `sdk.storage`.** `sdk.storage` (RFC 0044)
 does write real files to disk, but under **server-generated opaque object IDs**, not
@@ -205,20 +205,20 @@ scope for v1.
 
 ## Functional requirements
 
-| ID      | Requirement                                                                                                                                                                     |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| DOCS-01 | On first use the user lands directly in a **document workspace** — no setup required. They can create and edit documents immediately, with content stored locally on the platform. |
-| DOCS-02 | The user can create **folders** and **individual documents** — every document is filed under a folder. _Create folder_ prompts for a name; _create document_ (from inside a folder) opens the editor on a blank document.   |
-| DOCS-03 | Documents **autosave** continuously to the platform DB (no explicit Save). An autosave indicator communicates state ("Saving…", "All changes saved").                            |
-| DOCS-04 | The **editor** is **Markdown-canonical** with a **WYSIWYG view** over the same Markdown. Each user sets their **default view** (Markdown / WYSIWYG) as a stored preference.       |
-| DOCS-05 | A user may create up to **`FREE_DOC_LIMIT`** local documents (operator-set, default 25). At the limit, creating more requires connecting a **Sovereign Drive** (git repo).       |
-| DOCS-06 | Connecting a drive is an **opt-in, secondary** action from settings (or prompted at the quota limit). Documents created with a drive connected may be **git-backed**.           |
-| DOCS-07 | For a **git-backed** document, **Sync to Git** pushes its Markdown to the configured repository; **revisions** come from git commit history (commits filtered to the file path). |
-| DOCS-08 | The **document list** (home) shows all folders and documents owned by (or shared with) the user, with search, in a clean Google-Docs/Drive-style layout, plus a quota indicator. |
-| DOCS-09 | Opening a document opens a **viewer** (read-only render) with a toggle to **edit mode** (permission-gated).                                                                      |
-| DOCS-10 | The user can **share** a document with other instance users (roles owner/editor/viewer).                                                                                         |
-| DOCS-11 | A document can be **exported/downloaded as a plain `.md` file** at any time, regardless of tier.                                                                                  |
-| DOCS-12 | A document can be made **public** via a public link — expiring by default, permanent only when explicitly set (gated on RFC 0042).                                               |
+| ID      | Requirement                                                                                                                                                                                                               |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DOCS-01 | On first use the user lands directly in a **document workspace** — no setup required. They can create and edit documents immediately, with content stored locally on the platform.                                        |
+| DOCS-02 | The user can create **folders** and **individual documents** — every document is filed under a folder. _Create folder_ prompts for a name; _create document_ (from inside a folder) opens the editor on a blank document. |
+| DOCS-03 | Documents **autosave** continuously to the platform DB (no explicit Save). An autosave indicator communicates state ("Saving…", "All changes saved").                                                                     |
+| DOCS-04 | The **editor** is **Markdown-canonical** with a **WYSIWYG view** over the same Markdown. Each user sets their **default view** (Markdown / WYSIWYG) as a stored preference.                                               |
+| DOCS-05 | A user may create up to **`FREE_DOC_LIMIT`** local documents (operator-set, default 25). At the limit, creating more requires connecting a **Sovereign Drive** (git repo).                                                |
+| DOCS-06 | Connecting a drive is an **opt-in, secondary** action from settings (or prompted at the quota limit). Documents created with a drive connected may be **git-backed**.                                                     |
+| DOCS-07 | For a **git-backed** document, **Sync to Git** pushes its Markdown to the configured repository; **revisions** come from git commit history (commits filtered to the file path).                                          |
+| DOCS-08 | The **document list** (home) shows all folders and documents owned by (or shared with) the user, with search, in a clean Google-Docs/Drive-style layout, plus a quota indicator.                                          |
+| DOCS-09 | Opening a document opens a **viewer** (read-only render) with a toggle to **edit mode** (permission-gated).                                                                                                               |
+| DOCS-10 | The user can **share** a document with other instance users (roles owner/editor/viewer).                                                                                                                                  |
+| DOCS-11 | A document can be **exported/downloaded as a plain `.md` file** at any time, regardless of tier.                                                                                                                          |
+| DOCS-12 | A document can be made **public** via a public link — expiring by default, permanent only when explicitly set (gated on RFC 0042).                                                                                        |
 
 ## Editor and UI (Google Docs as reference)
 
@@ -309,15 +309,15 @@ schema restructure (roadmap task D-05) folds document content into
 draft→publish model and implies per-user collaboration that is post-v1), and adds
 `docs_user_prefs`.
 
-| Table                   | Key columns                                                                                                                                                                       |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Table                   | Key columns                                                                                                                                                                                                                                                                                                          |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `docs_documents`        | `id`, `tenant_id`, `owner_id`, `folder_id`, `title`, `slug`, **`content`** (canonical Markdown), **`storage`** (`db`\|`git`), `git_path?`, `base_sha?`, `sync_status?` (`synced`\|`pending`\|`conflict`), `last_synced_at?`, `created_at`, `updated_at` — every document belongs to a folder, there is no root level |
-| `docs_folders`          | `id`, `tenant_id`, `owner_id`, `name`, `slug`, `created_at`                                                                                                                        |
-| `docs_user_prefs`       | `user_id` (PK), `tenant_id`, `default_view` (`markdown`\|`wysiwyg`), `created_at`, `updated_at`                                                                                    |
-| `docs_drives`           | `user_id` (PK, one repo/user), `tenant_id`, `connection_id` (→ `sdk.connections`), `branch`, `base_path` (`docs`), `created_at` — **optional now; only exists for git-backed docs** |
-| `docs_document_members` | (`document_id`, `user_id`) PK, `tenant_id`, `role` (`owner`\|`editor`\|`viewer`), `invited_by?`, `joined_at`                                                                       |
-| `docs_folder_members`   | (`folder_id`, `user_id`) PK, `tenant_id`, `role` (`owner`\|`editor`\|`viewer`), `invited_by?`, `joined_at` — a folder role also grants access to every document filed under it (D-13-style "shared folder" model) |
-| `docs_public_shares`    | `id`, `tenant_id`, `document_id`, `token` (unique), `mode` (`expiring`\|`permanent`), `expires_at?`, `created_by`, `created_at` — v0.2 (D-17)                                       |
+| `docs_folders`          | `id`, `tenant_id`, `owner_id`, `name`, `slug`, `created_at`                                                                                                                                                                                                                                                          |
+| `docs_user_prefs`       | `user_id` (PK), `tenant_id`, `default_view` (`markdown`\|`wysiwyg`), `created_at`, `updated_at`                                                                                                                                                                                                                      |
+| `docs_drives`           | `user_id` (PK, one repo/user), `tenant_id`, `connection_id` (→ `sdk.connections`), `branch`, `base_path` (`docs`), `created_at` — **optional now; only exists for git-backed docs**                                                                                                                                  |
+| `docs_document_members` | (`document_id`, `user_id`) PK, `tenant_id`, `role` (`owner`\|`editor`\|`viewer`), `invited_by?`, `joined_at`                                                                                                                                                                                                         |
+| `docs_folder_members`   | (`folder_id`, `user_id`) PK, `tenant_id`, `role` (`owner`\|`editor`\|`viewer`), `invited_by?`, `joined_at` — a folder role also grants access to every document filed under it (D-13-style "shared folder" model)                                                                                                    |
+| `docs_public_shares`    | `id`, `tenant_id`, `document_id`, `token` (unique), `mode` (`expiring`\|`permanent`), `expires_at?`, `created_by`, `created_at` — v0.2 (D-17)                                                                                                                                                                        |
 
 **Removed:** `docs_drafts` (content moved into `docs_documents.content`; autosave
 writes the document row directly). No shipped data exists to migrate — regenerate
@@ -325,19 +325,19 @@ the SQLite + Postgres migrations fresh (dual-schema convention).
 
 ## SDK dependencies
 
-| SDK surface         | Used for                                           | Status                            |
-| ------------------- | -------------------------------------------------- | --------------------------------- |
-| `sdk.auth`          | Current user session                               | Stable                            |
-| `sdk.db`            | `docs_*` tables (content, metadata, prefs, shares) | Stable                            |
-| `sdk.env`           | **Operator-set `FREE_DOC_LIMIT` quota**            | Implemented (RFC 0018)            |
-| `sdk.directory`     | Share target picker                                | Implemented (RFC 0041)            |
-| `sdk.mailer`        | Share notification emails                          | Stable                            |
-| `sdk.notifications` | In-app/push share alerts                           | Implemented                       |
-| `sdk.data`          | Read-only document/snippet contracts               | Implemented                       |
-| `sdk.secrets`       | Per-user git token storage (opt-in tier)           | Implemented (RFC 0043)            |
-| `sdk.connections`   | Git connection metadata/lifecycle (opt-in tier)    | Implemented (RFC 0049)            |
-| `sdk.storage`       | Images/attachments (post-v1, D-19) — **not bodies**| Implemented (RFC 0044)            |
-| `sdk.tools`         | Future confirmed create/publish actions            | Not implemented (RFC 0047)        |
+| SDK surface         | Used for                                            | Status                     |
+| ------------------- | --------------------------------------------------- | -------------------------- |
+| `sdk.auth`          | Current user session                                | Stable                     |
+| `sdk.db`            | `docs_*` tables (content, metadata, prefs, shares)  | Stable                     |
+| `sdk.env`           | **Operator-set `FREE_DOC_LIMIT` quota**             | Implemented (RFC 0018)     |
+| `sdk.directory`     | Share target picker                                 | Implemented (RFC 0041)     |
+| `sdk.mailer`        | Share notification emails                           | Stable                     |
+| `sdk.notifications` | In-app/push share alerts                            | Implemented                |
+| `sdk.data`          | Read-only document/snippet contracts                | Implemented                |
+| `sdk.secrets`       | Per-user git token storage (opt-in tier)            | Implemented (RFC 0043)     |
+| `sdk.connections`   | Git connection metadata/lifecycle (opt-in tier)     | Implemented (RFC 0049)     |
+| `sdk.storage`       | Images/attachments (post-v1, D-19) — **not bodies** | Implemented (RFC 0044)     |
+| `sdk.tools`         | Future confirmed create/publish actions             | Not implemented (RFC 0047) |
 
 ### Data contracts
 
@@ -353,9 +353,14 @@ restores documents/metadata additively; remote git contents are not recreated
 unless the user reconnects a drive. User deletion removes the user's documents and
 prefs, disconnects the `sdk.connections` record (removing the linked `sdk.secrets`
 entry), revokes public shares created by the user, and transfers/archives shared
-folders and documents per membership — a folder with no successor member is
-hard-deleted along with every document still filed under it (documents cannot
-exist without a folder).
+folders and documents per membership. A folder with no _folder-member_ successor
+still checks whether any document filed under it is truly owned
+(`docs_documents.ownerId`) by someone else — reachable even without folder
+membership, since creating a document there only ever required folder access at
+creation time, not permanently — and transfers the folder to that document's owner
+instead of destroying it. Only a folder with no member successor **and** no
+differently-owned document left in it is hard-deleted (documents cannot exist
+without a folder).
 
 ## Build plan
 
@@ -401,8 +406,8 @@ Full task sequence and status: [ROADMAP.md](ROADMAP.md).
 
 ## Changelog
 
-| Version | Date         | Change                                                                                                                                                                                                                                                                                                                                             |
-| ------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0.3     | 20 Jul 2026  | **Local-first pivot.** Git demoted from mandatory/primary to opt-in/secondary. Platform DB is now the canonical store; documents **autosave** (no explicit Save/Publish for local docs). Introduced two **storage tiers** (local / git-backed) and an operator-set **`FREE_DOC_LIMIT`** quota via `sdk.env` (RFC 0018), counting local docs only. Editor re-specced as **Markdown-canonical with a WYSIWYG view** + per-user **default-view** preference. UX north star set to **Google Docs / Drive**. Data model: content folded into `docs_documents` (+ `storage`/git-sync fields), **`docs_drafts` dropped**, `docs_user_prefs` added; regenerate migrations. Documented why bodies stay in the DB (not `sdk.storage`) and that direct `fs` writes are prohibited. FRs rewritten (DOCS-01…12); build plan/roadmap reframed. `storage:readWrite` deferred to D-19. |
-| 0.2     | 16 Jul 2026  | Re-verified against `claude-sv` code. Replaced plugin-local credential encryption with `sdk.connections` (RFC 0049) + `sdk.secrets` (RFC 0043); dropped `docs_credentials`, slimmed `docs_drives`. Corrected `sdk.storage` from "stub" to implemented. Settled on `shell: default`. Fixed `minPlatformVersion` (0.19.0). Added `data:export`/`data:import` permissions. |
-| 0.1     | Jun 2026     | Initial proposal (git-backed, git-mandatory).                                                                                                                                                                                                                                                                                                     |
+| Version | Date        | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0.3     | 20 Jul 2026 | **Local-first pivot.** Git demoted from mandatory/primary to opt-in/secondary. Platform DB is now the canonical store; documents **autosave** (no explicit Save/Publish for local docs). Introduced two **storage tiers** (local / git-backed) and an operator-set **`FREE_DOC_LIMIT`** quota via `sdk.env` (RFC 0018), counting local docs only. Editor re-specced as **Markdown-canonical with a WYSIWYG view** + per-user **default-view** preference. UX north star set to **Google Docs / Drive**. Data model: content folded into `docs_documents` (+ `storage`/git-sync fields), **`docs_drafts` dropped**, `docs_user_prefs` added; regenerate migrations. Documented why bodies stay in the DB (not `sdk.storage`) and that direct `fs` writes are prohibited. FRs rewritten (DOCS-01…12); build plan/roadmap reframed. `storage:readWrite` deferred to D-19. |
+| 0.2     | 16 Jul 2026 | Re-verified against `claude-sv` code. Replaced plugin-local credential encryption with `sdk.connections` (RFC 0049) + `sdk.secrets` (RFC 0043); dropped `docs_credentials`, slimmed `docs_drives`. Corrected `sdk.storage` from "stub" to implemented. Settled on `shell: default`. Fixed `minPlatformVersion` (0.19.0). Added `data:export`/`data:import` permissions.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 0.1     | Jun 2026    | Initial proposal (git-backed, git-mandatory).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
