@@ -16,6 +16,7 @@ import {
   docsFolders,
   docsUserPrefs,
 } from '../_db/schema';
+import { now } from './context';
 
 // The SDK intentionally returns an opaque dialect-agnostic DB client.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -516,43 +517,103 @@ async function deleteAllDocsData(ctx: DeletionContext): Promise<DeletionResult> 
         );
       deleted += 1;
     } else {
-      // Sole owner, no one else has access — nothing left to preserve. A
-      // document can no longer be reparented to a root level (folders are
-      // mandatory), so any document still filed under this folder is
-      // cascade-deleted along with it — including one owned by a different
-      // user who only had editor access to this folder, since there's
-      // nowhere left for it to live. This is a real behavior change from
-      // when folders were optional: deleting a sole-owner folder's account
-      // now also removes its contents, not just reparents them.
-      const orphanedDocs = await db
-        .select({ id: docsDocuments.id })
+      // No existing folder *member* to hand off to — but a document filed
+      // here can still be truly owned (docs_documents.ownerId) by someone
+      // else entirely: creating a document only required folder membership
+      // at creation time (documents.ts's createDocument), and a document's
+      // owner never changes afterward even if that person's folder access is
+      // later revoked (folder-sharing.ts's removeFolderMember). By this
+      // point ctx.userId's *own* documents have already been resolved by
+      // the document loop above, so any document still sitting here with a
+      // different ownerId belongs to someone with no remaining stake in
+      // this deletion at all — cascading the folder would destroy their
+      // content along with it. Promote that document's owner to folder
+      // owner instead, the same way an existing folder member would be.
+      const docsInFolder = await db
+        .select({ ownerId: docsDocuments.ownerId })
         .from(docsDocuments)
         .where(and(eq(docsDocuments.tenantId, ctx.tenantId), eq(docsDocuments.folderId, folder.id)));
-      if (orphanedDocs.length > 0) {
-        const orphanedDocIds = orphanedDocs.map((d) => d.id);
-        await db
-          .delete(docsDocumentMembers)
+      const otherOwnerId = docsInFolder.find((d) => d.ownerId !== ctx.userId)?.ownerId;
+
+      if (otherOwnerId) {
+        const [existingMembership] = await db
+          .select({ role: docsFolderMembers.role })
+          .from(docsFolderMembers)
           .where(
             and(
-              eq(docsDocumentMembers.tenantId, ctx.tenantId),
-              inArray(docsDocumentMembers.documentId, orphanedDocIds),
+              eq(docsFolderMembers.tenantId, ctx.tenantId),
+              eq(docsFolderMembers.folderId, folder.id),
+              eq(docsFolderMembers.userId, otherOwnerId),
             ),
           );
+        if (existingMembership) {
+          await db
+            .update(docsFolderMembers)
+            .set({ role: 'owner' })
+            .where(
+              and(
+                eq(docsFolderMembers.tenantId, ctx.tenantId),
+                eq(docsFolderMembers.folderId, folder.id),
+                eq(docsFolderMembers.userId, otherOwnerId),
+              ),
+            );
+        } else {
+          await db.insert(docsFolderMembers).values({
+            folderId: folder.id,
+            userId: otherOwnerId,
+            tenantId: ctx.tenantId,
+            role: 'owner',
+            invitedBy: null,
+            joinedAt: now(),
+          });
+        }
         await db
-          .delete(docsDocuments)
+          .update(docsFolders)
+          .set({ ownerId: otherOwnerId })
+          .where(and(eq(docsFolders.id, folder.id), eq(docsFolders.tenantId, ctx.tenantId)));
+        await db
+          .delete(docsFolderMembers)
           .where(
-            and(eq(docsDocuments.tenantId, ctx.tenantId), inArray(docsDocuments.id, orphanedDocIds)),
+            and(
+              eq(docsFolderMembers.tenantId, ctx.tenantId),
+              eq(docsFolderMembers.folderId, folder.id),
+              eq(docsFolderMembers.userId, ctx.userId),
+            ),
           );
+        deleted += 1;
+      } else {
+        // Genuinely nothing left to preserve — no folder member, and no
+        // document filed here is owned by anyone but the user being deleted.
+        const orphanedDocs = await db
+          .select({ id: docsDocuments.id })
+          .from(docsDocuments)
+          .where(and(eq(docsDocuments.tenantId, ctx.tenantId), eq(docsDocuments.folderId, folder.id)));
+        if (orphanedDocs.length > 0) {
+          const orphanedDocIds = orphanedDocs.map((d) => d.id);
+          await db
+            .delete(docsDocumentMembers)
+            .where(
+              and(
+                eq(docsDocumentMembers.tenantId, ctx.tenantId),
+                inArray(docsDocumentMembers.documentId, orphanedDocIds),
+              ),
+            );
+          await db
+            .delete(docsDocuments)
+            .where(
+              and(eq(docsDocuments.tenantId, ctx.tenantId), inArray(docsDocuments.id, orphanedDocIds)),
+            );
+        }
+        await db
+          .delete(docsFolderMembers)
+          .where(
+            and(eq(docsFolderMembers.tenantId, ctx.tenantId), eq(docsFolderMembers.folderId, folder.id)),
+          );
+        await db
+          .delete(docsFolders)
+          .where(and(eq(docsFolders.id, folder.id), eq(docsFolders.tenantId, ctx.tenantId)));
+        deleted += 1;
       }
-      await db
-        .delete(docsFolderMembers)
-        .where(
-          and(eq(docsFolderMembers.tenantId, ctx.tenantId), eq(docsFolderMembers.folderId, folder.id)),
-        );
-      await db
-        .delete(docsFolders)
-        .where(and(eq(docsFolders.id, folder.id), eq(docsFolders.tenantId, ctx.tenantId)));
-      deleted += 1;
     }
   }
 

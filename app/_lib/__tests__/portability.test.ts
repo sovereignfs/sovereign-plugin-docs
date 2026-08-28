@@ -302,7 +302,7 @@ describe('portability import', () => {
 });
 
 describe('portability delete', () => {
-  it("transfers ownership of a document with other members instead of deleting it, removes the user's own share of a document they don't own, cascade-deletes a document filed under a folder that has no successor (even one already transferred at the document level), transfers a folder with a successor member, disconnects the drive connection, and cleans up preferences", async () => {
+  it("transfers ownership of a document with other members instead of deleting it, removes the user's own share of a document they don't own, transfers a folder with no member successor to a document it contains that was itself just transferred to someone else, transfers a folder with a successor member, disconnects the drive connection, and cleans up preferences", async () => {
     const { registerPortabilityHandlers } = await import('../portability');
     await registerPortabilityHandlers();
 
@@ -326,8 +326,9 @@ describe('portability delete', () => {
       { documentId: 'doc-1', userId: 'u1', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
       { documentId: 'doc-1', userId: 'other', tenantId: 't1', role: 'viewer', invitedBy: 'u1', joinedAt: 2 },
       // doc-2: same shape as doc-1 (u1 owner, 'other' viewer) -> also transfers at the
-      // document level, but folder-2 (its folder) has no successor and gets
-      // hard-deleted, cascading doc-2 away regardless of the document-level transfer.
+      // document level. folder-2 (its folder) has no *folder* member successor, but by
+      // the time the folder loop runs, doc-2 is already owned by 'other' — so folder-2
+      // transfers to 'other' too, instead of cascading doc-2 away underneath it.
       { documentId: 'doc-2', userId: 'u1', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
       { documentId: 'doc-2', userId: 'other', tenantId: 't1', role: 'viewer', invitedBy: 'u1', joinedAt: 2 },
       // doc-3: u1 only has a share on someone else's document.
@@ -338,7 +339,8 @@ describe('portability delete', () => {
       // folder-1: u1 owner, 'other' viewer -> transfers to 'other' (survives).
       { folderId: 'folder-1', userId: 'u1', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
       { folderId: 'folder-1', userId: 'other', tenantId: 't1', role: 'viewer', invitedBy: 'u1', joinedAt: 2 },
-      // folder-2: u1 is the sole member -> no successor, hard-deleted.
+      // folder-2: u1 is the sole *folder* member -> no member successor, but doc-2
+      // (already transferred to 'other' at the document level) gives it one anyway.
       { folderId: 'folder-2', userId: 'u1', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
       // folder-3: u1 has no role here at all (not shared the folder itself, just doc-3 individually).
       { folderId: 'folder-3', userId: 'other', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
@@ -347,24 +349,33 @@ describe('portability delete', () => {
     const result = await capturedDeleter.fn?.({ userId: 'u1', tenantId: 't1', db: fakeDb });
     expect(result).toBeDefined();
 
-    // folder-1 survives (transferred to 'other'); folder-2 is hard-deleted (no successor); folder-3 untouched.
-    expect(store.docs_folders.map((f) => f.id).sort()).toEqual(['folder-1', 'folder-3']);
+    // folder-1 survives (transferred to 'other' via an existing folder member);
+    // folder-2 also survives, transferred to 'other' via doc-2's document-level
+    // ownership even though 'other' was never a folder-2 member; folder-3 untouched.
+    expect(store.docs_folders.map((f) => f.id).sort()).toEqual(['folder-1', 'folder-2', 'folder-3']);
     expect(store.docs_folders.find((f) => f.id === 'folder-1')).toMatchObject({ ownerId: 'other' });
+    expect(store.docs_folders.find((f) => f.id === 'folder-2')).toMatchObject({ ownerId: 'other' });
     expect(store.docs_folder_members).toEqual([
       expect.objectContaining({ folderId: 'folder-1', userId: 'other', role: 'owner' }),
       expect.objectContaining({ folderId: 'folder-3', userId: 'other', role: 'owner' }),
+      expect.objectContaining({ folderId: 'folder-2', userId: 'other', role: 'owner' }),
     ]);
 
-    // doc-1 survives (its folder survived); doc-2 is cascade-deleted with
-    // folder-2 despite having its own document-level successor; doc-3
-    // (not owned by u1) is untouched.
-    expect(store.docs_documents.map((d) => d.id).sort()).toEqual(['doc-1', 'doc-3']);
+    // doc-1 survives (its folder survived); doc-2 also survives — its
+    // document-level transfer to 'other' is what saved folder-2 from being
+    // hard-deleted out from under it; doc-3 (not owned by u1) is untouched.
+    expect(store.docs_documents.map((d) => d.id).sort()).toEqual(['doc-1', 'doc-2', 'doc-3']);
     expect(store.docs_documents.find((d) => d.id === 'doc-1')).toMatchObject({
       ownerId: 'other',
       folderId: 'folder-1',
     });
+    expect(store.docs_documents.find((d) => d.id === 'doc-2')).toMatchObject({
+      ownerId: 'other',
+      folderId: 'folder-2',
+    });
     expect(store.docs_document_members).toEqual([
       expect.objectContaining({ documentId: 'doc-1', userId: 'other', role: 'owner' }),
+      expect.objectContaining({ documentId: 'doc-2', userId: 'other', role: 'owner' }),
       expect.objectContaining({ documentId: 'doc-3', userId: 'other', role: 'owner' }),
     ]);
 
@@ -373,5 +384,47 @@ describe('portability delete', () => {
     // The user's own preference row is removed; another user's is left intact.
     expect(store.docs_user_prefs).toEqual([expect.objectContaining({ userId: 'other' })]);
     expect(result?.deleted).toBeGreaterThan(0);
+  });
+
+  it("does not cascade-delete a document owned by a user whose folder access was later revoked, even though they are the folder's sole remaining member at deletion time", async () => {
+    // Reproduces a real, previously-shipped corruption bug: 'bystander' was
+    // once shared into u1's folder, created their own document there while
+    // they had access, and was later removed as a folder member (e.g. via
+    // removeFolderMember) — but a document's owner (docs_documents.ownerId)
+    // never changes just because their folder membership was revoked. When
+    // u1 (the folder's sole remaining member) deletes their account, the
+    // folder has no folder-member successor, but 'bystander' never had any
+    // role in this deletion at all — their document must survive.
+    const { registerPortabilityHandlers } = await import('../portability');
+    await registerPortabilityHandlers();
+
+    store.docs_folders = [
+      { id: 'folder-1', tenantId: 't1', ownerId: 'u1', name: 'Shared once', slug: 'shared-once', createdAt: 1 },
+    ];
+    store.docs_documents = [
+      { id: 'bystander-doc', tenantId: 't1', ownerId: 'bystander', folderId: 'folder-1', title: 'Not u1\'s at all', slug: 'bystander-doc', content: 'x', storage: 'db', createdAt: 1, updatedAt: 1 },
+    ];
+    store.docs_document_members = [
+      // 'bystander' is the document's sole member too — no overlap with u1 whatsoever.
+      { documentId: 'bystander-doc', userId: 'bystander', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
+    ];
+    store.docs_folder_members = [
+      // 'bystander's folder membership was already revoked before this deletion runs.
+      { folderId: 'folder-1', userId: 'u1', tenantId: 't1', role: 'owner', invitedBy: null, joinedAt: 1 },
+    ];
+
+    const result = await capturedDeleter.fn?.({ userId: 'u1', tenantId: 't1', db: fakeDb });
+    expect(result).toBeDefined();
+
+    // The folder survives, transferred to 'bystander' — the only remaining stakeholder.
+    expect(store.docs_folders).toEqual([expect.objectContaining({ id: 'folder-1', ownerId: 'bystander' })]);
+    expect(store.docs_folder_members).toEqual([
+      expect.objectContaining({ folderId: 'folder-1', userId: 'bystander', role: 'owner' }),
+    ]);
+    // The document itself is completely untouched.
+    expect(store.docs_documents).toEqual([expect.objectContaining({ id: 'bystander-doc', ownerId: 'bystander' })]);
+    expect(store.docs_document_members).toEqual([
+      expect.objectContaining({ documentId: 'bystander-doc', userId: 'bystander', role: 'owner' }),
+    ]);
   });
 });
